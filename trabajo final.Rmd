@@ -1,6 +1,8 @@
 ---
 title: "Técnicas en aprendizaje estadístico - Introduction to Statistical Learning - ISLR"
-author: "Luis Daniel Chavarría"
+author: 
+  - Luis Daniel Chavarría
+  - Hernán Darío Vanegas Madrigal
 date: "9/3/2020"
 output:
   rmdformats::readthedown:
@@ -52,7 +54,7 @@ head((weekly))
 Se evidencia un crecimiento constante con un alza grande en el año 2005 y una estabilización de la trayectoria alrededor del año 2007. Se añadió un ruido a la posición de cada punto para poder evidenciar la densidad, además de transparencia. Se utilizó el método `mgcv::gam` para ajustar la tendencia. 
 
 ```{r, warning=F, message=F}
-  p <- weekly %>%
+p <- weekly %>%
   ggplot(aes(x = Year, y = Volume)) +
   geom_jitter(alpha = 0.6) + 
   geom_smooth() +
@@ -282,3 +284,234 @@ final_class %>%
 ```
 
 Con base en los resultados anteriores se selecciona el modelo por tanteo por su *accuracy* superior, sin embargo, esto puede ser un sobreajuste del conjunto de prueba; por ello, si este modelo fuera a producción se recomienda realizar validación cruzada para identificar si la interacción de variables añadida es significativa. Si no es lo es, el modelo seleccionado por *Stepwise selection* se considera apropiado.
+
+# Literal 4.7.1 -  Ejercicio 11
+
+En este apartado, desarrollaremos un modelo para predecir cuando un carro tiene alto o bajo rendimiento de combustible respecto al kilometraje.
+
+
+Inicialmente observemos las características de este conjunto de datos. El conjunto de datos `Auto` contiene información sobre 392 vehículos cuyas variables son:
+
+- `mpg`: millas por galón.
+- `cylinders`: numero de cilindros (entre 4 y 8)
+- `displacement`: desplazamiento del motor en pies.
+- `horsepower`: caballos de fuerza del motor.
+- `weight`: peso del vehículo en libras.
+- `acceleration`: tiempo que tarda en acelerar de 0 a 60 medido en segundos.
+- `year`: modelo del auto (módulo 100)
+- `origin`: origen del vehiculo.
+- `name`: nombre del vehículo.
+
+Se mostrarán los primeros 6 datos junto con su encabezado.
+
+```{r}
+auto <- as_tibble(Auto)
+head(auto)
+```
+
+## a) Creación de una variable respuesta binaria
+
+A continuación crearemos la variabel `mpg01` que tomará el valor de 1 si la variable `mpg` esta por encima de la mediana, y 0 en caso contrario.
+
+```{r}
+median_mpg <- median(auto$mpg)
+
+auto <- auto %>% mutate(
+  mpg01 = case_when(
+    mpg >= median_mpg ~ 1,
+    mpg < median_mpg ~ 0
+  ),
+  mpg01 = as.factor(mpg01),
+  origin = as.factor(origin)
+)
+
+# Retiramos la variable mpg
+auto <- auto %>% dplyr::select(-mpg)
+head(auto)
+```
+
+## b) Relaciones entre las variables
+
+A continuación realicemos un análisis descriptivo para observar el comportamiento de las variables regresoras respecto a la variable `mpg01`
+
+```{r}
+ggpairs(data = auto, columns = 1:6, mapping = aes(color = mpg01), legend = 1, lower = list(continuous = wrap("points", alpha = 0.6))) +
+  theme_light() +
+  theme(legend.position = "bottom")
+```
+
+Por otro lado, demos una visualización para las variable `origin`, la cual es categórica.
+
+
+```{r}
+ggpairs(data = auto, columns = c(7, 9), mapping = aes(color = mpg01), legend = 1, lower = list(continuous = wrap("points", alpha = 0.6))) +
+  theme_light() +
+  theme(legend.position = "bottom")
+```
+
+
+Tomando en cuenta las gráficas, podemos afirmar que las variables `cylinders`, `displacement`, `horsepower` y `weight` son buenas variables cuantitativas para realizar una clasificación de la variable `mpg01`, pues al graficar discriminando por clases se puede observar que hay una particion notoria entre los carros de alto consumo y bajo consumo respecto a estas 4 variables. Note también que la variabele origen puede ser una buena variable predictora para `mpg01` cuando el tipo de carro es americano.
+
+## c) División de conjuntos de entrenamiento y validación
+
+A continuación dividiremos el conjunto `Auto` en dos conjuntos, uno de validación y otro de entrenamiento dejando el 75% de los datos para entrenar los modelos.
+
+```{r}
+library(caTools)
+
+split_ratio <- 0.75
+
+partition <-  sample.split(auto, SplitRatio = split_ratio)
+auto_train <- subset(auto, partition == TRUE)
+auto_test <- subset(auto, partition == FALSE)
+```
+
+## d) Modelo LDA
+
+A continuación realizaremos un modelo LDA considerando las varables que fueron extraidas en el análisis descriptivo y que se consideraron importantes a la hora de realizar una clasificación para la variable respuesta `mpg01`.
+
+```{r}
+lda_model = lda(mpg01 ~ cylinders + displacement + horsepower + weight + origin, data = auto_train)
+lda_model
+```
+
+Grafiquemos a continuación el resultado del modelo.
+
+```{r}
+plot(lda_model)
+```
+
+Ahora construyamos la matriz de confusión para el modelo con el conjunto de datos de validación para observar el desempeño.
+
+```{r}
+mpg_lda_class <- tibble(pred = predict(lda_model, auto_test %>% dplyr::select(-mpg01))$class ,
+                        real = auto_test$mpg01)
+
+mpg_lda_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo LDA")
+
+test_results_lda <- mpg_lda_class %>% 
+  metrics(truth = real, estimate = pred)
+
+test_results_lda
+```
+
+Note entonces que la tasa de clasificación correcta es de un `r round(test_results_lda$.estimate[1] * 100, 2)`%, lo que muestra que el modelo tiene una alta calidad.
+
+## e) Modelo QDA
+
+Con el fin de realizar una comparativa con el modelo anterior, realicemos un modelo QDA para predecir la varibale `mpg01` usando las variables más significativas encontradas en el análisis descriptivo. 
+
+```{r}
+qda_model = qda(mpg01 ~ cylinders + displacement + horsepower + weight + origin, data = auto_train)
+qda_model
+```
+
+Ahora construyamos la matriz de confusión para el modelo QDA con el conjunto de datos de validación.
+
+```{r}
+mpg_qda_class <- tibble(pred = predict(qda_model, auto_test %>% dplyr::select(-mpg01))$class ,
+                        real = auto_test$mpg01)
+
+mpg_qda_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo QDA")
+
+test_results_qda <- mpg_qda_class %>% 
+  metrics(truth = real, estimate = pred)
+
+test_results_qda
+```
+
+Note entonces que la tasa de clasificación correcta es de un `r round(test_results_qda$.estimate[1] * 100, 2)`%, y en comparación con el modelo LDA, se puede decir que tienen un desempeño muy parecido de acuerdo a la metrica de la tasa de clasificación correcta.
+
+## f) Modelo de regresión logística
+
+Por otra parte, construiremos un modelo de regresión logística para realizar una predicción de la variable `mpg01`.
+
+```{r}
+logistic_model <- glm(mpg01 ~ cylinders + displacement + horsepower + weight + origin, data = auto_train, family = binomial)
+summary(logistic_model)
+```
+
+Calculemos de igual manera la matriz de confusión para realizar una comparación con los métodos previos usando los datos de entrenamiento.
+
+```{r}
+predictions_prob_glm <- predict(logistic_model, auto_test %>% dplyr::select(-mpg01), type = "response")
+predictions_glm <- rep(0, nrow(auto_test))
+predictions_glm[predictions_prob_glm > 0.5] <- 1
+
+mpg_logistic_class <- tibble(pred = as.factor(predictions_glm),
+                        real = auto_test$mpg01)
+
+mpg_logistic_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo de regresión logística")
+
+test_results_logistic <- mpg_logistic_class %>% 
+  metrics(truth = real, estimate = pred)
+
+test_results_logistic
+```
+
+De acuerdo a este resultado, se puede ver que todos los métodos tienen un puntaje muy similar entre ellos pues en este caso, se puede observar una tasa de clasificación correcta del `r round(test_results_logistic$.estimate[1] * 100, 2)`%.
+
+## g) Modelo $KNN$
+
+Realicemos a continuación un modelo de $KNN$ para predecir la variable `mpg`, en este caso, debemos probar con varios casos de $K$ hallar un óptimo. Para esto, realizaremos una función que reciba como parámetro un numero $k$ y esta función retornará la tasa de clasificación correcta para el $k$ dado, realizando la clasificación sobre el conjunto de prueba.
+
+```{r}
+get_accuracy_knn <- function(k) {
+  knn_model <- knn(auto_train %>% dplyr::select(-mpg01, -name),
+                 auto_test %>% dplyr::select(-mpg01, -name), 
+                 auto_train$mpg01,
+                 k)
+
+  mpg_knn_class <- tibble(pred = as.factor(knn_model), real = auto_test$mpg01)
+  test_results_knn <- mpg_knn_class %>% 
+    metrics(truth = real, estimate = pred)
+  
+  return(test_results_knn$.estimate[1])
+}
+```
+
+Ahora tomaremos varios valores de $k$ en un rango entre 1 y 60, y para estos valores, computaremos su tasa de clasificación correcta y los graficaremos para observar cual es el mejor valor de $k$ en este rango.
+
+```{r}
+k_values = 1:60
+accuracy_results <- tibble(k = k_values, accuracy = sapply(k_values, get_accuracy_knn))
+
+g <- ggplot(data = accuracy_results) + 
+  geom_line(mapping = aes(x = k, y = accuracy)) +
+  xlab("K") + 
+  ylab("Tasa de clasificación correcta") +
+  theme_light()
+
+ggplotly(g, width = 800, height = 500)
+```
+
+Una vez observada la gráfica, encontraremos el mejor valor de $k$ que mejora la tasa de clasificación correcta, y además para este valor de $k$ realizaremos la matriz de confusión para ver el desempeño del modelo de manera global.
+
+```{r}
+best_k <- min(
+  accuracy_results[which(accuracy_results$accuracy == max(accuracy_results$accuracy)), "k"]
+)
+
+knn_best_model <- knn(auto_train %>% dplyr::select(-mpg01, -name),
+                 auto_test %>% dplyr::select(-mpg01, -name), 
+                 auto_train$mpg01,
+                 best_k)
+
+mpg_knn_class <- tibble(pred = as.factor(knn_best_model), real = auto_test$mpg01)
+  test_results_knn <- mpg_knn_class %>% 
+    metrics(truth = real, estimate = pred)
+  
+mpg_knn_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo KNN")
+
+best_accuracy_knn = round(get_accuracy_knn(best_k) * 100, 2)
+```
+
+Concluimos entonces que para los valores de $k$ probados, el mejor accuracy obtenido fue de `r best_accuracy_knn`%, el cual sigue siendo muy similar a los puntajes anteriores y desde un punto de vista global, estos puntajes denotan que los modelos tienen una muy buena calidad.
