@@ -45,6 +45,7 @@ library(yardstick) # Métricas
 library(MASS) # Clasificadores
 library(class) # Clasificadores
 library(broom) # Resultados tidy de modelos
+library(latex2exp) # Expresiones LaTex en las gráficas
 weekly <- as_tibble(Weekly)
 head((weekly))
 ```
@@ -357,13 +358,12 @@ Tomando en cuenta las gráficas, podemos afirmar que las variables `cylinders`, 
 A continuación dividiremos el conjunto `Auto` en dos conjuntos, uno de validación y otro de entrenamiento dejando el 75% de los datos para entrenar los modelos.
 
 ```{r}
-library(caTools)
-
 split_ratio <- 0.75
+smp_size <- floor(split_ratio * nrow(auto))
+train_ind <- sample(seq_len(nrow(auto)), size = smp_size)
 
-partition <-  sample.split(auto, SplitRatio = split_ratio)
-auto_train <- subset(auto, partition == TRUE)
-auto_test <- subset(auto, partition == FALSE)
+auto_train <- auto[train_ind, ]
+auto_test <- auto[-train_ind, ]
 ```
 
 ## d) Modelo LDA
@@ -463,16 +463,17 @@ Realicemos a continuación un modelo de $KNN$ para predecir la variable `mpg`, e
 
 ```{r}
 get_accuracy_knn <- function(k) {
+  set.seed(10)
   knn_model <- knn(auto_train %>% dplyr::select(-mpg01, -name),
                  auto_test %>% dplyr::select(-mpg01, -name), 
                  auto_train$mpg01,
                  k)
 
-  mpg_knn_class <- tibble(pred = as.factor(knn_model), real = auto_test$mpg01)
-  test_results_knn <- mpg_knn_class %>% 
+  knn_class <- tibble(pred = as.factor(knn_model), real = auto_test$mpg01)
+  results_knn <- knn_class %>% 
     metrics(truth = real, estimate = pred)
   
-  return(test_results_knn$.estimate[1])
+  return(results_knn$.estimate[1])
 }
 ```
 
@@ -494,6 +495,8 @@ ggplotly(g, width = 800, height = 500)
 Una vez observada la gráfica, encontraremos el mejor valor de $k$ que mejora la tasa de clasificación correcta, y además para este valor de $k$ realizaremos la matriz de confusión para ver el desempeño del modelo de manera global.
 
 ```{r}
+set.seed(10)
+
 best_k <- min(
   accuracy_results[which(accuracy_results$accuracy == max(accuracy_results$accuracy)), "k"]
 )
@@ -504,14 +507,97 @@ knn_best_model <- knn(auto_train %>% dplyr::select(-mpg01, -name),
                  best_k)
 
 mpg_knn_class <- tibble(pred = as.factor(knn_best_model), real = auto_test$mpg01)
-  test_results_knn <- mpg_knn_class %>% 
-    metrics(truth = real, estimate = pred)
+
+test_results_knn <- mpg_knn_class %>% 
+  metrics(truth = real, estimate = pred)
   
 mpg_knn_class %>% conf_mat(truth = real, estimate = pred) %>% 
   autoplot(type = "heatmap") + 
   labs(title = "Matriz de confusión para el modelo KNN")
 
-best_accuracy_knn = round(get_accuracy_knn(best_k) * 100, 2)
+best_accuracy_knn = round(test_results_knn$.estimate[1] * 100, 2)
 ```
 
 Concluimos entonces que para los valores de $k$ probados, el mejor accuracy obtenido fue de `r best_accuracy_knn`%, el cual sigue siendo muy similar a los puntajes anteriores y desde un punto de vista global, estos puntajes denotan que los modelos tienen una muy buena calidad.
+
+# Literal 4.7.1 -  Ejercicio 12
+
+## a) Implementación de la función `Power()`
+
+A continuación implementaremos una función `Power()` que calculará la potencia $2^3$
+
+```{r}
+Power <- function() {
+  two_power <- 2 ^ 3
+  print(two_power)
+}
+```
+
+## b) Implementación de la función `Power2()` generalizada
+
+Ahora, implementaremos la función `Power2()` que recibe dos parámetros `x` y `a` y computará $x^a$
+
+```{r}
+Power2 <- function(x, a) {
+  power_generalized <- x ^ a
+  print(power_generalized)
+}
+```
+
+## c) Usos de la funcion `Power2()`
+
+En el siguiente bloque de código calcularemos $10^3$.
+```{r}
+Power2(10, 3)
+```
+
+Ahora calcularemos el valor de $8^{17}$.
+```{r}
+Power2(8, 17)
+```
+
+Y finalmente calcularemos el valor de $131^3$. 
+```{r}
+Power2(131, 3)
+```
+
+## d) Implementación de la función `Power3()`
+
+Ahora implementaremos una versión mucho más general para realizar las potencias que esta basada en la función `Power2()` pero en este caso, la función no imprimirá el resultado sino que retornara dicho valor como un objeto de `R`
+
+```{r}
+Power3 <- function(x, a) {
+  result <- x ^ a
+  return(result)
+}
+```
+
+## e) Usando `Plot3()` para graficar la función $f(x) = x ^ 2$
+
+En este bloque de código, graficaremos $f(x) = x ^ 2$ usando una escala logaritmica para el eje $y$
+
+```{r}
+ggplot(data = tibble(x = 1:10, y = sapply(1:10, Power3, 2))) +
+  geom_line(mapping = aes(x = x, y = y)) +
+  xlab("x") + 
+  ylab(TeX("x^2")) +
+  scale_y_log10()
+```
+
+## f) Implementación de una forma generalizada para graficación 
+
+A continuación implementaremos un código para graficar la función $f(x) = x ^ a$ tal que $x \in I$ para un intervalo $I \subseteq \mathbb{R}$.
+
+```{r}
+PlotPower <- function(interval, a) {
+  ggplot(data = tibble(x = interval, y = sapply(interval, Power3, a))) +
+    geom_line(mapping = aes(x = x, y = y)) +
+    xlab("x") + 
+    ylab(TeX(paste0("x^", toString(a)))) + 
+    labs(title = "Gráfica de la función y = f(c)")
+}
+
+PlotPower(-10:10, 7)
+```
+
+
