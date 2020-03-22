@@ -20,6 +20,22 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r, message=F, warning=F, results=F}
+#Librerías
+library(tidyverse) # Manipulación, limpieza y gráficos
+library(ISLR) # Bases de datos
+library(plotly) # Interactividad gráfica
+library(ggthemes) # Presentación
+library(GGally) # Correlación
+library(yardstick) # Métricas
+library(MASS) # Clasificadores
+library(class) # Clasificadores
+library(tree) #CART - ISLR
+library(broom) # Resultados tidy de modelos
+library(latex2exp) # Expresiones LaTex en las gráficas
+```
+
+
 # Literal 4.7.1 -  Ejercicio 10
 
 ## a) Análisis descriptivo
@@ -35,17 +51,6 @@ El conjunto de datos `Weekly` contiene porcentajes de retorno semanales del índ
 Encabezados y primeras 6 observaciones:
 
 ```{r, message=F, warning=F}
-#Librerías
-library(tidyverse) # Manipulación, limpieza y gráficos
-library(ISLR) # Bases de datos
-library(plotly) # Interactividad gráfica
-library(ggthemes) # Presentación
-library(GGally) # Correlación
-library(yardstick) # Métricas
-library(MASS) # Clasificadores
-library(class) # Clasificadores
-library(broom) # Resultados tidy de modelos
-library(latex2exp) # Expresiones LaTex en las gráficas
 weekly <- as_tibble(Weekly)
 head((weekly))
 ```
@@ -774,3 +779,132 @@ boston_knn_class %>%
 ```
 
 El clasificador $KNN$ tiene una tasa de clasificación correcta del 91.1% utilizando $k = 3$ y todas las variables, sin embargo, al utilizar $k = 5$ y las mismas variables que la regresión logística se obtiene un 93.1% de predicción correcta.
+
+# Literal 8.4 -  Ejercicio 9
+
+El conjunto de datos `OJ` contiene 1070 compras donde los clientes compraron un jugo de naranja de *Citrus Hill* o de *Maid Orange Juice* y se guardaron un número de características de los clientes.
+
+## a) Conjuntos de entrenamiento y validación
+
+Crear un conjunto de entrenamiento con 800 observaciones y 270 de prueba
+
+```{r}
+oj_train <- as_tibble(OJ) %>% 
+  rownames_to_column() %>% 
+sample_n(size = 800)
+
+oj_test <- as_tibble(OJ) %>% 
+  rownames_to_column() %>% 
+  anti_join(oj_train, by = "rowname")
+
+oj_train <- oj_train %>% dplyr::select(-rowname)
+oj_test <- oj_test %>% dplyr::select(-rowname)
+dim(oj_train)
+dim(oj_test)
+```
+
+## b) Árbol de decisión
+
+```{r}
+oj_tree <- tree(Purchase ~ ., data = oj_train)
+summary(oj_tree)
+```
+
+El árbol resultante tiene 10 nodos terminales, la variable más importante es `LoyalCH` con una ponderación de 63, con una tasa de clasificación incorrecta de 14.88% en entrenamiento.
+
+## c) Interepretar el resultado de uno de los nodos
+
+Interpretemos el nodo 1: En este nodo ingresan 800 observaciones del conjunto de entrenamiento, hay 311 observaciones de la clase CH y 489 de la clase MM, se realiza una partición a la izquierda con 512 observaciones y  la derecha con 285 observaciones bajo el criterio $LoyalCH < 0.48285$.
+
+## d) Gráfica del árbol y resultados
+
+Los nodos utilizan las variables `CH` y `PriceDiff` para realizar la clasificación, los nodos terminales indican la clasificación final.
+
+```{r}
+plot(oj_tree)
+text(oj_tree)
+```
+
+## e) Predicciones, matriz de confusión y clasificación correcta
+
+```{r}
+oj_tree_class <- tibble(pred = predict(oj_tree, type="class", newdata = oj_test),
+                        real = oj_test$Purchase)
+
+oj_tree_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo CART para clasificación")
+
+oj_tree_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+Se obtiene una tasa de clasificación correcta del 80%. En general la mayor cantidad de errores se cometió al clasificar las variables CH como MM, esto ocurrió 29 veces.
+
+## f) Aplicar `cv.tree()` para determinar el tamaño óptimo del árbol
+
+```{r}
+oj_cv_tree <- cv.tree(oj_tree, FUN = prune.misclass)
+oj_cv_tree
+```
+
+## g) Gráfica con el tamaño del árbol y la validación cruzada
+
+```{r}
+par(mfrow = c(1, 2))
+plot(oj_cv_tree$size, oj_cv_tree$dev , type ="b")
+```
+
+## h) Árbol con la menor tasa de error de validación cruzada incorreta
+
+De acuerdo a la gráfica anterior, el árbol con tamaño 5 parece obtener el menor error de validación cruzada. Realicemos la poda de acuerdo a esta inforamción y grafiquemos el nuevo árbol.
+
+## i) Creación del árbol podado
+
+```{r}
+oj_prune <-  prune.misclass(oj_tree, best = 5)
+plot(oj_prune)
+text(oj_prune)
+```
+
+## j) Comparación de los errores de clasificación en entrenamiento
+
+```{r}
+oj_prune_class_train <- tibble(pred = predict(oj_prune, type="class"),
+                        real = oj_train$Purchase)
+
+oj_prune_class_train %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión en entrenamiento para el modelo CART podado para clasificación")
+
+oj_prune_class_train %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+Se obtiene una clasificación correcta del 84.5% para el modelo CART podado, esto se compara con el modelo completo que da una clasificación correcta del 85.2%, es decir, el modelo con validación cruzada es ligeramente peor en el conjunto de entrenamiento pero tiene una mayor capacidad de generalización gracias a que evita sobreajustar los datos.
+
+```{r}
+oj_tree_class_train <- tibble(pred = predict(oj_tree, type="class"),
+                        real = oj_train$Purchase)
+oj_tree_class_train %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+
+## k) Comparación los resultados del árbol podado vs el completo en validación
+
+```{r}
+oj_prune_class <- tibble(pred = predict(oj_prune, type="class", newdata = oj_test),
+                        real = oj_test$Purchase)
+
+oj_prune_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo CART podado para clasificación")
+
+oj_prune_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+En el árbol sin podar obtuvimos una tasa de clasificación correcta del 80%, sin embargo, al realizar la poda se obtuvo una tasa de clasificación correcta del 80.4%, que podría ser una mejora apreciable dependiendo del volumen de ventas de jugo de naranja asociado que trae la predicción correcta.
