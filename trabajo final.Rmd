@@ -20,7 +20,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Literal 4.7.1 -  Ejercicio 10
+# Sección 4.7 -  Ejercicio 10
 
 ## a) Análisis descriptivo
 
@@ -286,7 +286,7 @@ final_class %>%
 
 Con base en los resultados anteriores se selecciona el modelo por tanteo por su *accuracy* superior, sin embargo, esto puede ser un sobreajuste del conjunto de prueba; por ello, si este modelo fuera a producción se recomienda realizar validación cruzada para identificar si la interacción de variables añadida es significativa. Si no es lo es, el modelo seleccionado por *Stepwise selection* se considera apropiado.
 
-# Literal 4.7.1 -  Ejercicio 11
+# Sección 4.7 -  Ejercicio 11
 
 En este apartado, desarrollaremos un modelo para predecir cuando un carro tiene alto o bajo rendimiento de combustible respecto al kilometraje.
 
@@ -520,7 +520,7 @@ best_accuracy_knn = round(test_results_knn$.estimate[1] * 100, 2)
 
 Concluimos entonces que para los valores de $k$ probados, el mejor accuracy obtenido fue de `r best_accuracy_knn`%, el cual sigue siendo muy similar a los puntajes anteriores y desde un punto de vista global, estos puntajes denotan que los modelos tienen una muy buena calidad.
 
-# Literal 4.7.1 -  Ejercicio 12
+# Sección 4.7 -  Ejercicio 12
 
 ## a) Implementación de la función `Power()`
 
@@ -600,4 +600,4 @@ PlotPower <- function(interval, a) {
 PlotPower(-10:10, 7)
 ```
 
-
+# Sección 8.4 -  Ejercicio 8
