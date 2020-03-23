@@ -34,6 +34,8 @@ library(class) # Clasificadores
 library(tree) #CART - ISLR
 library(broom) # Resultados tidy de modelos
 library(latex2exp) # Expresiones LaTex en las gráficas
+library(randomForest) # Libreria para bosques aleatorios
+library(gbm) # Boosting
 ```
 
 
@@ -607,8 +609,6 @@ PlotPower <- function(interval, a) {
 PlotPower(-10:10, 7)
 ```
 
-
-
 # Sección 4.7.1 -  Ejercicio 13
 
 Utilizaremos el conjunto de datos `Boston` para predecir si un suburbio tiene un porcentaje de crimen mayor o menor que la media. El conjunto de datos tiene las siguientes variables:
@@ -783,6 +783,11 @@ boston_knn_class %>%
 ```
 
 El clasificador $KNN$ tiene una tasa de clasificación correcta del 91.1% utilizando $k = 3$ y todas las variables, sin embargo, al utilizar $k = 5$ y las mismas variables que la regresión logística se obtiene un 93.1% de predicción correcta.
+
+
+# Sección 8.4 -  Ejercicio 7
+
+En este literal, tomaremos el conjunto de datos `Boston` y analizaremos de una manera mas detallada el efecto de los parámetros en el $MSE$
 
 # Sección 8.4 -  Ejercicio 9
 
