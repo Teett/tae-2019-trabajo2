@@ -16,6 +16,14 @@ editor_options:
   chunk_output_type: console
 ---
 
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -1170,3 +1178,6 @@ oj_prune_class %>%
 ```
 
 En el árbol sin podar obtuvimos una tasa de clasificación correcta del 80%, sin embargo, al realizar la poda se obtuvo una tasa de clasificación correcta del 80.4%, que podría ser una mejora apreciable dependiendo del volumen de ventas de jugo de naranja asociado que trae la predicción correcta.
+
+# Sección 8.4 -  Ejercicio 8
+
