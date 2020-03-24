@@ -798,16 +798,12 @@ boston <- as_tibble(Boston) %>% mutate(
 head(boston)
 ```
 
-Ahora graficaremos el error de prueba con los siguientes valores de `mtry` y `ntree`
+Ahora graficaremos el error de prueba con los siguientes valores de `mtry` y `ntree`. Para calcular el error de prueba en cada uno de los valores, crearemos una función que evalua el error de prueba en cada caso.
 
 ```{r}
 mtry_values = 2:(ncol(boston) - 1)
 ntree_values = 3:100
-```
 
-Para calcular el error de prueba en cada uno de los valores, crearemos una función que evalua el error de prueba en cada caso.
-
-```{r}
 test_error_random_forest <- function(row, train, test) {
   mtry_test <- row[1]
   ntree_test <- row[2]
@@ -821,7 +817,7 @@ test_error_random_forest <- function(row, train, test) {
 }
 ```
 
-Ahora dividiremos el conjunto de datos en datos de entrenamiento y datos de prueba.
+Ahora dividiremos el conjunto de datos en datos de entrenamiento y datos de prueba. Se obtienen las siguientes dimensiones de los conjuntos de entrenamiento y prueba respectivamente.
 
 ```{r}
 split_ratio <- 0.75
@@ -830,6 +826,9 @@ train_ind <- sample(seq_len(nrow(boston)), size = smp_size)
 
 boston_train <- boston[train_ind, ]
 boston_test <- boston[-train_ind, ]
+
+dim(boston_train)
+dim(boston_test)
 ```
 
 Creamos un dataframe para los valores a probar
@@ -840,6 +839,7 @@ colnames(test_values) <- c("mtry_values", "ntree_values")
 test_values <- as_tibble(test_values)
 
 test_values["error"] <- apply(test_values, 1, test_error_random_forest, boston_train, boston_test)
+head(test_values)
 ```
 
 Y finalmente graficamos los errores mediante una grafica de niveles como se muestra a continuación.
@@ -878,7 +878,7 @@ head(carseats)
 
 ## a) División del conjunto de datos en entrenamiento y validación 
 
-A continuación dividiremos el conjunto de datos en un conjunto de validación y otro de prueba.
+A continuación dividiremos el conjunto de datos en un conjunto de validación y otro de prueba, obteniendo las siguientes dimensiones respectivamente.
 
 ```{r}
 split_ratio <- 0.75
@@ -887,6 +887,9 @@ train_ind <- sample(seq_len(nrow(carseats)), size = smp_size)
 
 carseats_train <- carseats[train_ind, ]
 carseats_test <- carseats[-train_ind, ]
+
+dim(carseats_train)
+dim(carseats_test)
 ```
 
 ## b) Entrenamiento de un árbol de regresión
@@ -895,17 +898,17 @@ Ahora, entrenaremos un árbol de regresión.
 
 ```{r}
 tree_carseats <- tree(Sales ~ ., data = carseats_train)
-summary(tree_carseats)
+tree_carseats
 ```
 
 La gráfica del arbol se muestra a continuación.
 
 ```{r}
 plot(tree_carseats)
-text(tree_carseats ,pretty = 0)
+text(tree_carseats, pretty = 0)
 ```
 
-Con este arbol entrenado, calculemnos el error de prueba como se muestra a continuación
+Con este arbol entrenado, calculemos el error de prueba como se muestra a continuación
 
 ```{r}
 test_predict <- predict(tree_carseats, carseats_test)
@@ -919,7 +922,125 @@ Y tambien mostremos el $RMSE$ para este modelo tomando el conjunto de entrenamie
 sqrt(mse_test)
 ```
 
-Como conclusión se puede observar que una variable que determina el numero de venta de manera diferenciadora es la variable `ShelveLoc`, note entonces que cuando un local tiene buena calidad en las estanterías del punto de venta, la cantidad de ventas es mucho mayor respecto a locales con una calidad mas baja. Aún así, los productos con un precio más bajo tiende a tener una cantidad de unidades vendidas mucho mas alta. Por tanto, dos aspectos que favorecen a las ventas es tener un local con buena calidad y precios por debajo de 97.5 dólares. Finalemente el modelo es altamente efectivo mediante este metodo 
+Como conclusión se puede observar que una variable que determina el numero de venta de manera diferenciadora es la variable `ShelveLoc`, note entonces que cuando un local tiene buena calidad en las estanterías del punto de venta, la cantidad de ventas es mucho mayor respecto a locales con una calidad mas baja. Aún así, los productos con un precio más bajo tiende a tener una cantidad de unidades vendidas mucho mas alta. Por tanto, dos aspectos que favorecen a las ventas es tener un local con buena calidad y precios por debajo de 97.5 dólares. Finalemente, considerando que la raiz del error cuadrático medio es aproximadamente de `r sqrt(mse_test)`, quiere decir que el modelo se equivoca en un radio de `r sqrt(mse_test)`, lo que realmente da una predicción aceptable sobre los asientos vendidos.
+
+## c) Uso de validacion cruzada para determinar el nivel de complejidad óptimo
+
+En esta sección podaremos el árbol entrenado usando validación cruzada, con el objetivo de mejorar la calidad de la recomendación.
+
+```{r}
+cv_prune_tree_carseats <- cv.tree(tree_carseats)
+cv_prune_tree_carseats
+```
+
+Grafiquemos ahora la sumatoria de errores cuadráticos respecto al tamaño del árbol.
+
+```{r}
+g <- ggplot(data = data.frame(size = cv_prune_tree_carseats$size, dev = cv_prune_tree_carseats$dev)) +
+  geom_line(mapping = aes(x = size, y = dev)) +
+  geom_point(mapping = aes(x = size, y = dev)) +
+  labs(x = "Numero de nodos hoja", y = "Sumatoria de errores cuadráticos", title = "Error de predicción respecto al tamaño del árbol")
+ggplotly(g)
+```
+
+Note entonces que la validación cruzada arroja que el mejor árbol es el árbol original sin podar. Como se puede apreciar en la gráfica, el arbol mas grande es aquel que tiene mejor sumatoria de errores cuadráticos, por tanto no se recomienda podar el árbol.
+
+## d) Bagging e importancia de las variables
+
+Ahora, usaremos *bagging* con el objetivo de observar si hay una mejora en la predicción y tambien se requiere observar cuáles son las variables mas importantes en este modelo.
+
+Incialmente realizaremos *bagging* y compararemos el $RMSE$ con los métodos previos.
+
+```{r}
+bagging_carseats <- randomForest(Sales ~ ., data = carseats_train, importance = TRUE, mtry = ncol(carseats) - 1)
+bagging_carseats
+```
+
+Calculemos ahora el error de validación para este método
+
+```{r}
+test_bagging_carseats <- predict(bagging_carseats, carseats_test)
+test_mse_bagging_carseats <- mean((test_bagging_carseats - carseats_test$Sales) ^ 2)
+test_mse_bagging_carseats
+```
+
+Note entonces que el error de validación es mayor en este caso respecto al árbol de regresión. Ahora usemos el método `importance()` para determinar la importancia de las variables en este conjunto de datos.
+
+```{r}
+importance(bagging_carseats)
+```
+
+Veamos una grafica de la importancia para cada una de las variables.
+
+```{r}
+varImpPlot(bagging_carseats)
+```
+
+Note entonces que el incremento en la impureza y el porcentaje de incremento del MSE revelan que las variables `ShelveLoc` y `Price` son las que tienen mas relevancia dentro del modelo, y esta relevancia es bastante marcada respecto a las demás variables.
+
+## e) Uso de bósques aleatorios
+
+En esta ocasión usaremos bosques aleatorios para determinar si este método es más efectivo y además, observaremos cuales son las variables de mayor importancia para este método considerando el conjunto de datos `Carseats`.
+
+Primero entrenemos un modelo con los parámetros por defecto, obteniendo el siguiente $MSE$
+
+```{r}
+random_forest_carseats <- randomForest(Sales ~ ., data = carseats_train)
+result_test_carseats <- predict(random_forest_carseats, newdata = carseats_test)
+mean((result_test_carseats - carseats_test$Sales) ^ 2)
+```
+
+Luego, analicemos la importancia de las variables usando la funcion `importance()`
+
+```{r}
+importance(random_forest_carseats)
+```
+
+Para tener una visualización de dicha importancia, consideremos la siguiente grafica.
+
+```{r}
+varImpPlot(random_forest_carseats)
+```
+
+Note entonces que, al igual que sucedio con el *bagging*, las dos variables mas importantes para este modelo son `ShelveLoc` y `Price`, y su importancia se resalta de manera significativa sobre las demás variables.
+
+A continuación, veamos el efecto de $m$ sobre el bosque aleatorio. Crearemos una función que reciba un valor de $m$ y calcule el error de validación.
+
+```{r}
+get_mse_random_forest <- function(m, train, test) {
+  random_forest_test <- randomForest(Sales ~ ., data = train, mtry = m)
+  result_test <- predict(random_forest_test, newdata = test)
+  error <- mean((result_test - test$Sales) ^ 2)
+  return(error)
+} 
+```
+
+Ahora graficaremos el valor del $MSE$ con respecto a $m$.
+
+```{r}
+m_values <- 1:(ncol(carseats) - 1)
+mse_values <- sapply(m_values, get_mse_random_forest, carseats_train, carseats_test)
+
+m_mse_values = data.frame(m_values, mse_values)
+
+g <- ggplot(data = m_mse_values) +
+  geom_line(mapping = aes(x = m_values, y = mse_values)) +
+  geom_point(mapping = aes(x = m_values, y = mse_values)) +
+  labs(x = "m", y = "MSE", title = "Valor de MSE para cada valor de m")
+
+ggplotly(g)
+```
+
+Luego, extraeremos el mejor $m$ como sigue.
+
+```{r}
+best_m <- m_mse_values[which(m_mse_values$mse_values == min(m_mse_values$mse_values)), "m_values"]
+best_mse <- min(m_mse_values$mse_values)
+best_m
+```
+
+De esta manera, se muestra que considerando `r best_m` variables dentro de la decisión en cada nodo, se obtiene un $MSE$ de
+`r best_mse`.
 
 # Sección 8.4 -  Ejercicio 9
 
