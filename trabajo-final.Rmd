@@ -787,7 +787,139 @@ El clasificador $KNN$ tiene una tasa de clasificación correcta del 91.1% utiliz
 
 # Sección 8.4 -  Ejercicio 7
 
-En este literal, tomaremos el conjunto de datos `Boston` y analizaremos de una manera mas detallada el efecto de los parámetros en el $MSE$
+En este literal, tomaremos el conjunto de datos `Boston` y analizaremos de una manera mas detallada el efecto de los parámetros en el $MSE$.
+
+Inicialmente creamos el conjunto de datos a analizar
+
+```{r}
+boston <- as_tibble(Boston) %>% mutate(
+  chas = as.factor(chas)
+)
+head(boston)
+```
+
+Ahora graficaremos el error de prueba con los siguientes valores de `mtry` y `ntree`
+
+```{r}
+mtry_values = 2:(ncol(boston) - 1)
+ntree_values = 3:100
+```
+
+Para calcular el error de prueba en cada uno de los valores, crearemos una función que evalua el error de prueba en cada caso.
+
+```{r}
+test_error_random_forest <- function(row, train, test) {
+  mtry_test <- row[1]
+  ntree_test <- row[2]
+  test_tree <- randomForest(formula = medv ~ ., 
+                          data = train,
+                          mtry = mtry_test,
+                          ntree = ntree_test)
+  test_predicted_medv <- predict(test_tree, newdata = test)
+  error <- mean((test_predicted_medv - test$medv) ^ 2)
+  return(error)
+}
+```
+
+Ahora dividiremos el conjunto de datos en datos de entrenamiento y datos de prueba.
+
+```{r}
+split_ratio <- 0.75
+smp_size <- floor(split_ratio * nrow(boston))
+train_ind <- sample(seq_len(nrow(boston)), size = smp_size)
+
+boston_train <- boston[train_ind, ]
+boston_test <- boston[-train_ind, ]
+```
+
+Creamos un dataframe para los valores a probar
+
+```{r}
+test_values <- expand.grid(mtry_values, ntree_values)
+colnames(test_values) <- c("mtry_values", "ntree_values")
+test_values <- as_tibble(test_values)
+
+test_values["error"] <- apply(test_values, 1, test_error_random_forest, boston_train, boston_test)
+```
+
+Y finalmente graficamos los errores mediante una grafica de niveles como se muestra a continuación.
+
+```{r}
+fig <- plot_ly(data = test_values, x=~mtry_values,y=~ntree_values, z=~error, type = "contour", colorscale='Jet') %>% 
+  layout(
+    xaxis = list(title = "Valores de mtry"),
+    yaxis = list(title = "Valores de ntree"))
+fig %>% colorbar(title = "MSE")
+```
+
+Observemos que para esta seleccion de conjuntos de entrenamiento y de validación, se cumple que el *bagging* no es el metodo mas efectivo, pues allí la grafica se muestra mas oscura, y por tanto evidencia un valor mas alto del MSE. Para este caso, el valor de `mtree` más adecuado se encuentra entre 4 y 5. Note que los valores de `ntree` no tienen una relacion alguna con el $MSE$, pues  los mejores valores del error de validación se pueden envontrar con valores de `ntree`cercanos a 100 pero tambien con valores cercanos a 50. Sin embargo, valores bajos del `ntree` dan errores muy altos sin importar el valor de `mtree`.
+
+# Sección 8.4 -  Ejercicio 8
+
+Analizaremos el conjunto de datos `Carseats`, el cuál es un conjunto de datos que posee información respecto a sillas para niño que se ubican dentro de los automoviles, y realizaremos una regresión para la variable `Sales`. Las variables que tiene este conjunto de datos son las siguientes:
+
+- `Sales`: unidades vendidas en miles en cada una de las ubicaciones.
+- `CompPrice`: precio por competidor en cada ubicación.
+- `Income`: ingresos de la comunidad en miles de dólares.
+- `Advertising`: presupuesto para propaganda local en cada ubicación.
+- `Population`: poblacion en cada región.
+- `Price`: precio de los asientos en cada sitio.
+- `ShelveLoc`: calidad de los puntos de venta en cada ubicación.
+- `Age`: edad promedio de la población en cada ubicación.
+- `Education`: nivel de educación en cada ubicación.
+- `Urban`: determina si la tienda se encuentra en territorio rural o urbano.
+- `US`: determina is la tienda esta en EE.UU.
+
+```{r}
+carseats <- as_tibble(Carseats)
+head(carseats)
+```
+
+
+## a) División del conjunto de datos en entrenamiento y validación 
+
+A continuación dividiremos el conjunto de datos en un conjunto de validación y otro de prueba.
+
+```{r}
+split_ratio <- 0.75
+smp_size <- floor(split_ratio * nrow(carseats))
+train_ind <- sample(seq_len(nrow(carseats)), size = smp_size)
+
+carseats_train <- carseats[train_ind, ]
+carseats_test <- carseats[-train_ind, ]
+```
+
+## b) Entrenamiento de un árbol de regresión
+
+Ahora, entrenaremos un árbol de regresión.
+
+```{r}
+tree_carseats <- tree(Sales ~ ., data = carseats_train)
+summary(tree_carseats)
+```
+
+La gráfica del arbol se muestra a continuación.
+
+```{r}
+plot(tree_carseats)
+text(tree_carseats ,pretty = 0)
+```
+
+Con este arbol entrenado, calculemnos el error de prueba como se muestra a continuación
+
+```{r}
+test_predict <- predict(tree_carseats, carseats_test)
+mse_test <- mean((test_predict - carseats_test$Sales) ^ 2)
+mse_test
+```
+
+Y tambien mostremos el $RMSE$ para este modelo tomando el conjunto de entrenamiento.
+
+```{r}
+sqrt(mse_test)
+```
+
+Como conclusión se puede observar que una variable que determina el numero de venta de manera diferenciadora es la variable `ShelveLoc`, note entonces que cuando un local tiene buena calidad en las estanterías del punto de venta, la cantidad de ventas es mucho mayor respecto a locales con una calidad mas baja. Aún así, los productos con un precio más bajo tiende a tener una cantidad de unidades vendidas mucho mas alta. Por tanto, dos aspectos que favorecen a las ventas es tener un local con buena calidad y precios por debajo de 97.5 dólares. Finalemente el modelo es altamente efectivo mediante este metodo 
 
 # Sección 8.4 -  Ejercicio 9
 
