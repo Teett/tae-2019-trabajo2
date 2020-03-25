@@ -1179,5 +1179,84 @@ oj_prune_class %>%
 
 En el árbol sin podar obtuvimos una tasa de clasificación correcta del 80%, sin embargo, al realizar la poda se obtuvo una tasa de clasificación correcta del 80.4%, que podría ser una mejora apreciable dependiendo del volumen de ventas de jugo de naranja asociado que trae la predicción correcta.
 
-# Sección 8.4 -  Ejercicio 8
+# Sección 8.4 -  Ejercicio 10
+
+El objetivo de esta sección es usar *boosting* para hacer una predicción sobre la variable `Salary` en el conjunto de datos `Hitters`
+
+El conjunto de datos recoge información sobre jugadores de béisbol de las ligas mayores de Estados Unidos. A continuación se muestra un resumen de dicho conjunto de datos.
+
+```{r}
+hitters <- as_tibble(Hitters)
+head(hitters)
+```
+
+## a) Remoción de NA's y escalamiento logaritmico
+
+Inicialmente se eliminaran aquellas filas donde el salario tenga el valor `NA`. Para ello primero observemos si la columna `Salary` es la única que tiene `NA`.
+
+```{r}
+summary(hitters)
+```
+
+Note entonces que la única columna que tiene `NA` es `Salary`. Ahora podemos eliminar estas filas y verificar que no quedan `NA`
+
+```{r}
+hitters <- hitters[complete.cases(hitters), ]
+summary(hitters)
+```
+
+Ahora realicemos un escalamiento logaritmico sobre la columna `Salary`
+
+```{r}
+hitters <- hitters %>% mutate(
+  Salary = log10(Salary)
+)
+head(hitters)
+```
+
+## b) Seleccion de los conjuntos de prueba y validación 
+
+Se seleccionan las primeras 200 filas como el conjunto de prueba y las filas restantes se seleccionan como conjunto de validación, obteniendo los dos siguientes conjuntos de datos de manera respectiva.
+
+```{r}
+hitters_train <- hitters[1:200, ]
+hitters_test <- hitters[201:nrow(hitters), ]
+hitters_train
+hitters_test
+```
+
+## c) Aplicación de *boosting* y determinación del parametro $\lambda$ de contracción
+
+En esta sección realizaremos *boosting* y calcularemos el mejor parámetro de contracción $\lambda$ sobre un determinado rango. Para esto, crearemos una función que calcule el $MSE$ recibiendo $\lambda$ como parámetro.
+
+```{r}
+get_mse_boosting <- function(lambda, train, test) {
+  test_gbm = gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = lambda)
+  predict_test = predict(test_gbm, newdata = test, n.trees = 1000)
+  error = mean((predict_test - test$Salary) ^ 2)
+  return(error)
+}
+```
+
+Ahora definamos el rango sobre el cual se quiere graficar los $MSE$, y realicemos dicha gráfica usando la función que se definió anteriormente.
+
+```{r}
+lambda_values = seq(0.01, 1, by = 0.01)
+mse_values_hitters = sapply(lambda_values, get_mse_boosting, hitters_train, hitters_test)
+
+lambda_mse_values_df <- data.frame(lambda_values, mse_values = mse_values_hitters)
+
+best_lambda_boosting <- lambda_mse_values_df[which(lambda_mse_values_df$mse_values == min(lambda_mse_values_df$mse_values)), "lambda_values"]
+
+best_mse_boosting <- min(lambda_mse_values_df$mse_values)
+
+ggplot(data = lambda_mse_values_df) +
+  geom_line(mapping = aes(x = lambda_values, y = mse_values)) +
+  labs(x = TeX("$\\lambda$"), y = "MSE")
+```
+
+En esta gráfica se puede apreciar que el mejor valor para $\lambda$ es `r best_lambda_boosting` con el cual se obtiene un $MSE$ de `r best_mse_boosting`.
+
+## d) Comparación de *boosting* con métodos previos
+
 
