@@ -44,6 +44,7 @@ library(broom) # Resultados tidy de modelos
 library(latex2exp) # Expresiones LaTex en las gráficas
 library(randomForest) # Libreria para bosques aleatorios
 library(gbm) # Boosting
+library(pls) # Principal component regression
 ```
 
 
@@ -1259,4 +1260,30 @@ En esta gráfica se puede apreciar que el mejor valor para $\lambda$ es `r best_
 
 ## d) Comparación de *boosting* con métodos previos
 
+En esta sección compararemos el $MSE$ de boosting respecto a otros métodos vistos ateriormente como regresión lineal múltiple y regresión de componentes principales.
 
+Primero calculemos el $MSE$ para el metodo de regresión lineal múltiple
+
+```{r}
+linear_hitters = lm(Salary ~ ., data = hitters_train)
+linear_hitters_pred = predict(linear_hitters, hitters_test)
+error_linear = mean((linear_hitters_pred - hitters_test$Salary))
+error_linear
+```
+
+Por otro lado, apliquemos regresión con componentes principales para extraer el $MSE$.
+
+```{r}
+pcr_hitters = pcr(Salary ~ ., data = hitters_train, scale = TRUE, validation = "CV")
+summary(pcr_hitters)
+```
+
+En este caso, encontramos que el menor valor optimo se logró con $M = 17$ por tanto calcularemos el error de validación con dicho número de componentes, obteniendo así el siguiente $MSE$
+
+```{r}
+pcr_hitters_pred = predict(pcr_hitters, hitters_test, ncomp = 17)
+error_pcr = mean((pcr_hitters_pred - hitters_test$Salary))
+error_pcr
+```
+
+Finalmente, concluimos que en este caso el boosting no era la mejor opción, pues encontramos que el $MSE$ para la regresión lineal multiple era mucho menor, y de hecho es el menor de los tres $MSE$ de prueba calculados.
