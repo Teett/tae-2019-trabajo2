@@ -1422,3 +1422,39 @@ radial_svm_test_error <- mean(predict_svm_syntetic_test_radial == syntetic_test$
 ```
 
 Note entonces que en este caso, la tasa de clasificación correcta es de `r radial_svm_test_error * 100`%, lo que muestra que el kernel radial es superior al kernel lineal cuando no hay una separación lineal entre las clases, como era de esperarse. Sin embargo el cambio entre ambos modelos es muy significativo, pues se pasa de tener un modelo cuya selección en la practica corresponde a un clasificador aleatorio uniforme, a tener un modelo con un desempeño casi perfecto.
+
+# Sección 9.7 - Ejercicio 5
+
+En esta sección se observará que mediante la aplicación de regresión logística, tambien se puede obtener una frontera de decisión no lineal como se logra con las máquinas de soporte vectorial.
+
+## a) Construcción de los datos sintéticos
+
+Inicialmente vamos a generar un conjunto de datos sintéticos, con una separación cuadrática entre las clases. A continuación mostraremos la generación de este conjunto de datos.
+
+```{r}
+x1_values <- runif(n = 500) - 0.5
+x2_values <- runif(n = 500) - 0.5
+focus <- 1/8
+y <- 1*(x1_values ^ 2 - x2_values ^ 2 > focus ^ 2)
+
+syntetic_quadratic <- tibble(x1_values, x2_values, as.factor(y))
+head(syntetic_quadratic)
+```
+
+## b) Gráfica de los datos sintéticos
+
+Ahora veamos una gráfica del conjunto de datos para visualizar la separación de los datos.
+
+```{r}
+g <- ggplot(data = syntetic_quadratic) + 
+  geom_point(mapping = aes(x = x1_values, y = x2_values, color = y)) +
+  labs(x = "X1", y = "X2", color = "y", title = "Conjunto de datos sintéticos")
+
+ggplotly(g)
+```
+
+Note entonces que los elementos que tienen el valor de $y = 1$ son aquellos elementos que verifican la ecuación $x_1^2 - x_2^2 > r^2$ donde $r = 1/8$, formando así una frontera de decisión cuadrática.
+
+## c) Entrenamiento de un modelo logístico
+
+Tomando en cuenta los datos construidos en los literales anteriores, vamos a entrenar un modelo de regresión logística.
