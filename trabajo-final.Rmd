@@ -45,6 +45,8 @@ library(latex2exp) # Expresiones LaTex en las gráficas
 library(randomForest) # Libreria para bosques aleatorios
 library(gbm) # Boosting
 library(pls) # Principal component regression
+library(ggforce) # Características adicionales para ggplot
+library(e1071) # Maquinas de soporte vectorial
 ```
 
 
@@ -618,7 +620,7 @@ PlotPower <- function(interval, a) {
 PlotPower(-10:10, 7)
 ```
 
-# Sección 4.7.1 -  Ejercicio 13
+# Sección 4.7 -  Ejercicio 13
 
 Utilizaremos el conjunto de datos `Boston` para predecir si un suburbio tiene un porcentaje de crimen mayor o menor que la media. El conjunto de datos tiene las siguientes variables:
 
@@ -1232,9 +1234,9 @@ En esta sección realizaremos *boosting* y calcularemos el mejor parámetro de c
 
 ```{r}
 get_mse_boosting <- function(lambda, train, test) {
-  test_gbm = gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = lambda)
-  predict_test = predict(test_gbm, newdata = test, n.trees = 1000)
-  error = mean((predict_test - test$Salary) ^ 2)
+  test_gbm <- gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = lambda)
+  predict_test <- predict(test_gbm, newdata = test, n.trees = 1000)
+  error <- mean((predict_test - test$Salary) ^ 2)
   return(error)
 }
 ```
@@ -1243,7 +1245,7 @@ Ahora definamos el rango sobre el cual se quiere graficar los $MSE$, y realicemo
 
 ```{r}
 lambda_values = seq(0.01, 1, by = 0.01)
-mse_values_hitters = sapply(lambda_values, get_mse_boosting, hitters_train, hitters_test)
+mse_values_hitters <- sapply(lambda_values, get_mse_boosting, hitters_train, hitters_test)
 
 lambda_mse_values_df <- data.frame(lambda_values, mse_values = mse_values_hitters)
 
@@ -1265,25 +1267,158 @@ En esta sección compararemos el $MSE$ de boosting respecto a otros métodos vis
 Primero calculemos el $MSE$ para el metodo de regresión lineal múltiple
 
 ```{r}
-linear_hitters = lm(Salary ~ ., data = hitters_train)
-linear_hitters_pred = predict(linear_hitters, hitters_test)
-error_linear = mean((linear_hitters_pred - hitters_test$Salary))
+linear_hitters <- lm(Salary ~ ., data = hitters_train)
+linear_hitters_pred <- predict(linear_hitters, hitters_test)
+error_linear <- mean((linear_hitters_pred - hitters_test$Salary))
 error_linear
 ```
 
 Por otro lado, apliquemos regresión con componentes principales para extraer el $MSE$.
 
 ```{r}
-pcr_hitters = pcr(Salary ~ ., data = hitters_train, scale = TRUE, validation = "CV")
+pcr_hitters <- pcr(Salary ~ ., data = hitters_train, scale = TRUE, validation = "CV")
 summary(pcr_hitters)
 ```
 
 En este caso, encontramos que el menor valor optimo se logró con $M = 17$ por tanto calcularemos el error de validación con dicho número de componentes, obteniendo así el siguiente $MSE$
 
 ```{r}
-pcr_hitters_pred = predict(pcr_hitters, hitters_test, ncomp = 17)
-error_pcr = mean((pcr_hitters_pred - hitters_test$Salary))
+pcr_hitters_pred <- predict(pcr_hitters, hitters_test, ncomp = 17)
+error_pcr <- mean((pcr_hitters_pred - hitters_test$Salary))
 error_pcr
 ```
 
 Finalmente, concluimos que en este caso el boosting no era la mejor opción, pues encontramos que el $MSE$ para la regresión lineal multiple era mucho menor, y de hecho es el menor de los tres $MSE$ de prueba calculados.
+
+## f) Importancia de las variables
+
+Ahora observaremos cual es la improtancia de las variables respecto a este método. Para ello entrenemos el modelo con el mejor lambda obtenido y analicemos la tabla de importancias.
+
+```{r}
+gbm_hitters <- gbm(Salary ~ ., data = hitters_train, distribution = "gaussian", n.trees = 1000, shrinkage = best_lambda_boosting)
+summary(gbm_hitters)
+```
+
+Se puede concluir entonces que las variables `CAtBat`, `CHits` y `CRuns` son las variables que más influyentes dentro del modelo.
+
+## g) Aplicación de *bagging*
+
+En este caso aplicaremos *bagging* sobre este conjunto de datos y observaremos su $MSE$ de prueba. Dicho $MSE$ se muestra a continuación
+
+```{r}
+bagging_hitters <- randomForest(Salary ~ ., data = hitters_train, mtry = ncol(hitters_train) - 1, importance = TRUE)
+bagging_predict_test_hitters <- predict(bagging_hitters, hitters_test)
+bagging_error_mse <- mean((bagging_predict_test_hitters - hitters_test$Salary) ^ 2)
+bagging_error_mse
+```
+
+Como conclusión podemos observar que el *bagging* no ofrece un cambio positivo respecto al error, pues al analizar los $MSE$ de prueba obtenidos con los anteriores métodos, el método lineal sigue siendo el más efectivo de todos.
+
+# Sección 9.7 - Ejercicio 4
+
+El objetivo de este ejercicio es verificar la efectividad del metodo *SVM* para clasificar un conjunto de datos donde no hay una separación lineal entre ellos. Observaremos entonces una comparacion entre un clasificador de soporte vectorial y una maquina de soporte vectorial con kernel polinomial o con un kernel radial.
+
+Primero crearemos el conjunto de datos sintéticos con una separacion no lineal.
+
+```{r}
+x1_values <- runif(100, min = 0, max = 1)
+x2_values <- runif(100, min = 0, max = 1)
+radius <- 3 / 8
+syntetic_df <- as_tibble(data.frame(x1 = x1_values, x2 = x2_values))
+
+syntetic_df <- syntetic_df %>% mutate(
+  Class = case_when(
+    (x1 - 0.5) ^ 2 + (x2 - 0.5) ^ 2 <= radius ^ 2 ~ 1,
+    (x1 - 0.5) ^ 2 + (x2 - 0.5) ^ 2 > radius ^ 2 ~ 0,
+  ),
+  Class = as.factor(Class)
+)
+
+head(syntetic_df)
+```
+
+Grafiquemos el conjunto de datos generado.
+
+```{r}
+ggplot(data = syntetic_df) +
+  geom_point(mapping = aes(x = x1, y = x2, color = Class)) +
+  geom_circle(mapping = aes(x0 = 0.5, y0 = 0.5, r = radius)) +
+  labs(x = TeX("$X_1$"), y = TeX("$X_2$"))
+```
+
+Ahora dividiremos el conjunto de datos en un conjunto para entrenamiento y otro conjunto para validación, de la siguiente manera.
+
+```{r}
+set.seed(10)
+split_ratio <- 0.75
+smp_size <- floor(split_ratio * nrow(syntetic_df))
+train_ind <- sample(seq_len(nrow(syntetic_df)), size = smp_size)
+
+syntetic_train <- syntetic_df[train_ind, ]
+syntetic_test <- syntetic_df[-train_ind, ]
+
+dim(syntetic_train)
+dim(syntetic_test)
+```
+
+Primero entrenemos un SVC (Support Vector Classifier) y extraigamos su error en el conjunto de entrenamiento. Es importante notar que tomaremos el costo para la frontera de clasificación como 10 y observaremos el de este costo sobre los demás modelos.
+
+```{r}
+linear_svm_syntethic <- svm(Class ~ ., data = syntetic_train, kernel = "linear", cost = 10, scale = FALSE)
+summary(linear_svm_syntethic)
+```
+
+Grafiquemos la clasificación y observemos los resultados.
+
+```{r}
+plot(linear_svm_syntethic, syntetic_train)
+```
+
+Y ahora, vamos a extraer el error sobre el conjunto de entrenamiento.
+
+```{r}
+linear_svm_train_error <- mean(linear_svm_syntethic$fitted == syntetic_train$Class)
+```
+
+Note entonces que la region clasifica de manera correcta el `r 100 * linear_svm_train_error`% de los datos de entrenamiento (esta es la tasa de clasificación correcta de entrenamiento para dicho modelo).
+
+A continuación, computemos la tasa de clasificación correcta para el conjunto de validación.
+
+```{r}
+predict_svm_syntetic_test <- predict(linear_svm_syntethic, syntetic_test)
+linear_svm_test_error <- mean(predict_svm_syntetic_test == syntetic_test$Class)
+```
+
+Se puede notar entonces que para el conjunto de datos de validación, se tiene una tasa de clasificación correcta del `r linear_svm_test_error * 100`%. Note que en este caso la grafica es aproximada a la de entrenamiento, pues este clasificador es muy similar a tomar cualquier pareja $X_1$ y $X_2$ y asignarles de manera aleatoria uniforme la etiqueta 1 o 0.
+
+Veamos el comportamiento de un kernel radial para este conjunto de datos. Para este caso, tomaremos un valor de $\gamma = 1$.
+
+```{r}
+radial_svm_syntethic <- svm(Class ~ ., data = syntetic_train, kernel = "radial", gamma = 1, cost = 10, scale = FALSE)
+summary(radial_svm_syntethic)
+```
+
+Realicemos una gráfica para este clasificador sobre el conjunto de entrenamiento, como se muestra a continuación.
+
+```{r}
+plot(radial_svm_syntethic, syntetic_train)
+```
+
+Es importante apreciar que el clasificador radial hace una clasificación casi perfecta, o al menos así se aprecia graficamente, además toma un conjunto mucho mas razonable de vectores de soporte, que son los que están más cercanos a la frontera de clasificación, al contrario del metodo lineal, el cual tomaba vectores de soporte que no corresponden a la intuición del modelo.
+
+Ahora, para verificar el argumento que se mostró en el parrafo anterior, verifiquemos el error de entrenamiento de este modelo.
+
+```{r}
+radial_svm_train_error <- mean(radial_svm_syntethic$fitted == syntetic_train$Class)
+```
+
+Note entonces que la tasa de clasificación correcta para el conjunto de entrenamiento tomando un kernel radial es de `r radial_svm_train_error * 100`%, lo cual muestra una efectividad superior al clasificador de soporte vectorial (usando kernel lineal)
+
+De igual manera, observemos la tasa de clasificación correcta para este modelo con kernel radial.
+
+```{r}
+predict_svm_syntetic_test_radial <- predict(radial_svm_syntethic, syntetic_test)
+radial_svm_test_error <- mean(predict_svm_syntetic_test_radial == syntetic_test$Class)
+```
+
+Note entonces que en este caso, la tasa de clasificación correcta es de `r radial_svm_test_error * 100`%, lo que muestra que el kernel radial es superior al kernel lineal cuando no hay una separación lineal entre las clases, como era de esperarse. Sin embargo el cambio entre ambos modelos es muy significativo, pues se pasa de tener un modelo cuya selección en la practica corresponde a un clasificador aleatorio uniforme, a tener un modelo con un desempeño casi perfecto.
