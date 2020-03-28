@@ -1314,6 +1314,83 @@ bagging_error_mse
 
 Como conclusión podemos observar que el *bagging* no ofrece un cambio positivo respecto al error, pues al analizar los $MSE$ de prueba obtenidos con los anteriores métodos, el método lineal sigue siendo el más efectivo de todos.
 
+# Sección 8.4 -  Ejercicio 11 
+
+El conjunto de datos `Caravan` contiene 5822 registros de clientes de compañía de seguros, donde cada uno de estos se posee 86 variables con datos sociodemográficos y sus productos asociados.
+
+La variable `Purchase` indica si el cliente compró o no un programa de seguros de la compañía.
+
+## a) Conjunto de entrenamiento con las primeras 1000 observaciones
+
+Dado que el problema a resolver es de clasificación, se utiliza el argumento `distribution = "bernoulli"`, sin embargo esta respuesta requiere que transformemos la variable respuesta de "Yes" y "No" a 1 y 0.
+
+```{r}
+caravan <- as_tibble(Caravan) %>% 
+  mutate(Purchase = case_when(Purchase == "Yes" ~ 1,
+                              TRUE ~ 0))
+caravan_train <- caravan[1:1000,]
+caravan_test <- caravan[1001:5822,]
+```
+
+## b) Ajuste de un modelo Random Forest con *Boosting* utilizando $\lambda = 0.01$, 1000 árboles y variables más importantes
+
+
+```{r, warning=F}
+caravan_boost <- gbm(Purchase ~ ., data = caravan_train, distribution = "bernoulli", n.trees = 1000, shrinkage = 0.01)
+head(summary(caravan_boost), n = 10)
+```
+
+Las variables más importantes del modelo son `PPERSAUT` y `MKOOPKLA`, lastimosamente no hay una descripción clara de qué representan en el conjunto de datos.
+
+```{r}
+par(mfrow = c(1 ,2) )
+plot(caravan_boost, i= "PPERSAUT")
+plot(caravan_boost, i= "MKOOPKLA")
+```
+
+En las gráficas de importancia parcial para estas dos variables se ilustra su efecto marginal sobre la respuesta luego de integrar las demás variables. En este caso se identifica que la probabilidad de que ocurra una compra decrece con los valores de ambas variables.
+
+## c) Predicción en el conjunto de prueba para probabilidades mayores a 20% 
+
+```{r}
+caravan_boost_class <- tibble(value = predict(caravan_boost, newdata = caravan_test, n.trees = 1000, type = "response"),
+                     pred = as_factor(case_when(value > 0.2 ~ 1,
+                                                  TRUE ~ 0)),
+                     real = as_factor(caravan_test$Purchase))
+
+caravan_boost_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo de Random Forest con Boosting")
+
+caravan_boost_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+Se obtiene una tasa de clasificación correcta del 92%, sin embargo, sólo el 11.7% de los clientes que sí realizaron la compra se predicen correctamente, lo cual puede ser un resultado inadecuado dependiendo de las decisiones de negocio realizadas con esta predicción. Esto se debe a que la clase "No" tiene muchos más valores y por ende la tasa de clasificación correcta no es una medida representativa para la clase "Yes".
+
+Al realizar comparación con la regresión logística se obtienen los siguientes resultados:
+
+```{r, fig.width=7, fig.height=4, warning = F}
+caravan_logistic <- glm(Purchase ~ ., data = caravan_train, family = binomial)
+
+
+caravan_logistic_class <- tibble(value = predict(caravan_logistic, newdata = caravan_test, type = "response"),
+                                pred = as_factor(case_when(value > 0.2 ~ 1,
+                                                  TRUE ~ 0)),
+                     real = as_factor(caravan_test$Purchase))
+
+caravan_logistic_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") +
+  labs(title = "Matriz de confusión para el modelo de regresión logística")
+
+caravan_logistic_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+La tasa de clasificación correcta del modelo de regresión logística disminuye al 88% de 92%, sin embargo, ésta discrimina mejor los casos en los que sí se realiza una compra, pasando del 11.7% del modelo de *boosting* a un 20%.
+
 # Sección 9.7 - Ejercicio 4
 
 El objetivo de este ejercicio es verificar la efectividad del metodo *SVM* para clasificar un conjunto de datos donde no hay una separación lineal entre ellos. Observaremos entonces una comparacion entre un clasificador de soporte vectorial y una maquina de soporte vectorial con kernel polinomial o con un kernel radial.
