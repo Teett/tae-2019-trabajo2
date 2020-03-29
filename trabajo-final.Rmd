@@ -1391,6 +1391,174 @@ caravan_logistic_class %>%
 
 La tasa de clasificación correcta del modelo de regresión logística disminuye al 88% de 92%, sin embargo, ésta discrimina mejor los casos en los que sí se realiza una compra, pasando del 11.7% del modelo de *boosting* a un 20%.
 
+# Sección 8.4 -  Ejercicio 12
+
+En este ejercicio utilizaremos información médica de pacientes para predecir si tienen o no enfermedad del corazón. El objetivo es predecir la variable `hd`, donde 0 es saludable y 1 significa que padece una enfermedad del corazón.
+
+
+```{r}
+heart_disease <- "http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data" %>% 
+  read_csv(col_names = FALSE) 
+
+names(heart_disease) = c(
+  "age",
+  "sex",# 0 = female, 1 = male
+  "cp", # chest pain
+  # 1 = typical angina,
+  # 2 = atypical angina,
+  # 3 = non-anginal pain,
+  # 4 = asymptomatic
+  "trestbps", # resting blood pressure (in mm Hg)
+  "chol", # serum cholestoral in mg/dl
+  "fbs",  # fasting blood sugar if less than 120 mg/dl, 1 = TRUE, 0 = FALSE
+  "restecg", # resting electrocardiographic results
+  # 1 = normal
+  # 2 = having ST-T wave abnormality
+  # 3 = showing probable or definite left ventricular hypertrophy
+  "thalach", # maximum heart rate achieved
+  "exang",   # exercise induced angina, 1 = yes, 0 = no
+  "oldpeak", # ST depression induced by exercise relative to rest
+  "slope", # the slope of the peak exercise ST segment
+  # 1 = upsloping
+  # 2 = flat
+  # 3 = downsloping
+  "ca", # number of major vessels (0-3) colored by fluoroscopy
+  "thal", # this is short of thalium heart scan
+  # 3 = normal (no cold spots)
+  # 6 = fixed defect (cold spots during rest and exercise)
+  # 7 = reversible defect (when cold spots only appear during exercise)
+  "hd" # (the predicted attribute) - diagnosis of heart disease
+  # 0 if less than or equal to 50% diameter narrowing
+  # 1 if greater than 50% diameter narrowing
+)
+
+heart_disease <- heart_disease %>%
+  mutate(
+    sex = case_when(sex == 1 ~ "Male",
+                    sex == 0 ~ "Female"),
+    sex = as_factor(sex),
+    cp = as_factor(cp),
+    fbs = as_factor(fbs),
+    restecg = as_factor(restecg),
+    exang = as_factor(exang), 
+    slope = as_factor(slope),
+    ca = as.integer(ca) %>% as_factor(),
+    thal = as.integer(thal) %>% as_factor(),
+    hd = case_when(hd == 0 ~ 0,
+                   hd >= 1 ~ 1)) %>% 
+  drop_na()
+head(heart_disease)
+
+hd_split_ratio <- 0.75
+hd_smp_size <- floor(hd_split_ratio * nrow(heart_disease))
+hd_train_ind <- sample(seq_len(nrow(heart_disease)), size = hd_smp_size)
+
+hd_train <- heart_disease[hd_train_ind, ]
+hd_test <- heart_disease[-hd_train_ind, ]
+```
+
+## Modelo de *Boosting* para clasificación de enfermedad del corazón
+
+Las 3 variables que más influyen en el diagnóstico correcto de la enfermedad del corazón son `ca`, que es el número de *major vessels* por la técnica de fluoroscopía, `thal`, que es el escaneo de talio del corazón y `cp`, que corresponde al tipo de dolor de pecho.
+
+```{r}
+heart_boost <- gbm(hd ~ ., data = hd_train, distribution = "bernoulli", n.trees = 1000, shrinkage = 0.01)
+heart_boost
+summary(heart_boost)
+heart_boost_class <- tibble(value = predict(heart_boost, newdata = hd_test, n.trees = 1000, type = "response"),
+                     pred = as_factor(case_when(value > 0.9 ~ 1,
+                                                  TRUE ~ 0)),
+                     real = as_factor(hd_test$hd))
+
+heart_boost_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo de Boosting")
+
+heart_boost_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+El modelo de *boosting* clasificó de manera correcta el 74.7% de las observaciones del conjunto de prueba, con sólo 1 falso negativo. Es importante notar que en un caso médico como éste vale la pena crear falsos positivos, ya que son menos costosos, sin embargo, no diagnosticar a un paciente con enfermedad del corazón podría tener consecuencias fatales.
+
+Por este motivo, se ha cambiado el umbral de probabilidad al 90% con el objetivo de producir menos falsos negativos, sacrificando parte de la capacidad de clasificación correcta de falsos positivos.
+
+## Modelo de *Bagging* para clasificación de enfermedad del corazón
+
+Las 3 variables que más influyen en el diagnóstico correcto de la enfermedad del corazón son `ca`, que es el número de *major vessels* por la técnica de fluoroscopía, `thal`, que es el escaneo de talio del corazón y `cp`, que corresponde al tipo de dolor de pecho.
+
+```{r}
+hd_train <- hd_train %>% 
+  mutate(hd = as_factor(hd))
+hd_test <- hd_test %>% 
+  mutate(hd = as_factor(hd))
+
+heart_bag <- randomForest(hd ~ ., data = hd_train, importance = TRUE, mtry = ncol(hd_train)-1)
+heart_bag
+
+
+heart_bag_class <- tibble(pred = predict(heart_bag, newdata = hd_test),
+                     real = as_factor(hd_test$hd))
+
+heart_bag_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo de Random Forest con Bagging")
+
+
+heart_bag_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+El modelo de *bagging* tiene un rendimiento considerablemente menor con una tasa de clasificación correcta del 77.3%, especialmente porque no puede ser parametrizado para minimizar los falsos negativos, lo cuál podría resultar en personas no diagnosticadas de manera peligrosa.
+
+## Modelo de Random Forest para clasificación de enfermedad del corazón
+
+Las 3 variables que más influyen en el diagnóstico correcto de la enfermedad del corazón son `ca`, que es el número de *major vessels* por la técnica de fluoroscopía, `thal`, que es el escaneo de talio del corazón y `cp`, que corresponde al tipo de dolor de pecho.
+
+```{r}
+
+heart_rf <- randomForest(hd ~ ., data = hd_train, importance = TRUE)
+heart_rf
+
+
+heart_rf_class <- tibble(pred = predict(heart_rf, newdata = hd_test),
+                     real = as_factor(hd_test$hd))
+
+heart_rf_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo de Random Forest")
+
+
+heart_rf_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+El modelo de *Random Forst* sin *Bagging* tiene un rendimiento ligeramente mejor que el modelo con *Bagging*, sin embargo sufre del mismo problema de clasificación de falsos negativos altos, lo qeu podría conducir a fatalidades.
+
+## Modelo de regresión logística para clasificación de enfermedad del corazón
+
+```{r}
+heart_log <- glm(hd ~ ., data = hd_train, family = "binomial")
+
+heart_log_class <- tibble(value = predict(heart_log, newdata = hd_test, type = "response"),
+                     pred = as_factor(case_when(value > 0.8 ~ 1,
+                                                  TRUE ~ 0)),
+                     real = as_factor(hd_test$hd))
+
+heart_log_class %>% 
+conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo de Regresión logística")
+
+heart_log_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+En este caso, incrementar el umbral a 90% no mejora los falsos negativos, por lo que se deja en 80%, lo que produce una tasa de clasificación correcta del 85.3%, presentando mejor rendimiento que las técnicas de *Boosting*, *Bagging* y *Random Forest*.
+
+
 # Sección 9.7 - Ejercicio 4
 
 El objetivo de este ejercicio es verificar la efectividad del metodo *SVM* para clasificar un conjunto de datos donde no hay una separación lineal entre ellos. Observaremos entonces una comparacion entre un clasificador de soporte vectorial y una maquina de soporte vectorial con kernel polinomial o con un kernel radial.
