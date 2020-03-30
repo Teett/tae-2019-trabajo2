@@ -47,6 +47,7 @@ library(gbm) # Boosting
 library(pls) # Principal component regression
 library(ggforce) # Características adicionales para ggplot
 library(e1071) # Maquinas de soporte vectorial
+library(caret) # Some models and plots
 ```
 
 
@@ -1636,6 +1637,18 @@ linear_svm_test_error <- mean(predict_svm_syntetic_test == syntetic_test$Class)
 
 Se puede notar entonces que para el conjunto de datos de validación, se tiene una tasa de clasificación correcta del `r linear_svm_test_error * 100`%. Note que en este caso la grafica es aproximada a la de entrenamiento, pues este clasificador es muy similar a tomar cualquier pareja $X_1$ y $X_2$ y asignarles de manera aleatoria uniforme la etiqueta 1 o 0.
 
+Esto se puede ver un poco mas claro observando la matriz de confusión para este modelo.
+
+```{r}
+svm_syntetic_test_class <- tibble(pred = predict_svm_syntetic_test ,
+                        real = syntetic_test$Class)
+
+svm_syntetic_test_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo SVM con kernel lineal")
+```
+
+
 Veamos el comportamiento de un kernel radial para este conjunto de datos. Para este caso, tomaremos un valor de $\gamma = 1$.
 
 ```{r}
@@ -1666,6 +1679,18 @@ predict_svm_syntetic_test_radial <- predict(radial_svm_syntethic, syntetic_test)
 radial_svm_test_error <- mean(predict_svm_syntetic_test_radial == syntetic_test$Class)
 ```
 
+Observemos como es la matriz de confusión para este modelo con kernel radial.
+
+```{r}
+svm_syntetic_test_radial_class <- tibble(pred = predict_svm_syntetic_test_radial ,
+                        real = syntetic_test$Class)
+
+svm_syntetic_test_radial_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo SVM con kernel radial")
+```
+
+
 Note entonces que en este caso, la tasa de clasificación correcta es de `r radial_svm_test_error * 100`%, lo que muestra que el kernel radial es superior al kernel lineal cuando no hay una separación lineal entre las clases, como era de esperarse. Sin embargo el cambio entre ambos modelos es muy significativo, pues se pasa de tener un modelo cuya selección en la practica corresponde a un clasificador aleatorio uniforme, a tener un modelo con un desempeño casi perfecto.
 
 # Sección 9.7 - Ejercicio 5
@@ -1682,9 +1707,25 @@ x2_values <- runif(n = 500) - 0.5
 focus <- 1/8
 y <- 1*(x1_values ^ 2 - x2_values ^ 2 > focus ^ 2)
 
-syntetic_quadratic <- tibble(x1_values, x2_values, as.factor(y))
+syntetic_quadratic <- tibble(x1 = x1_values, x2 = x2_values, y = as.factor(y))
 head(syntetic_quadratic)
 ```
+
+Ahora construiremos los conjuntos de entrenamiento y de pruebas para entrenar los posteriores modelos.
+
+```{r}
+set.seed(16)
+split_ratio <- 0.75
+smp_size <- floor(split_ratio * nrow(syntetic_quadratic))
+train_ind <- sample(seq_len(nrow(syntetic_quadratic)), size = smp_size)
+
+syntetic_quadratic_train <- syntetic_quadratic[train_ind, ]
+syntetic_quadratic_test <- syntetic_quadratic[-train_ind, ]
+
+dim(syntetic_quadratic_train)
+dim(syntetic_quadratic_test)
+```
+
 
 ## b) Gráfica de los datos sintéticos
 
@@ -1692,7 +1733,7 @@ Ahora veamos una gráfica del conjunto de datos para visualizar la separación d
 
 ```{r}
 g <- ggplot(data = syntetic_quadratic) + 
-  geom_point(mapping = aes(x = x1_values, y = x2_values, color = y)) +
+  geom_point(mapping = aes(x = x1, y = x2, color = y)) +
   labs(x = "X1", y = "X2", color = "y", title = "Conjunto de datos sintéticos")
 
 ggplotly(g)
@@ -1702,4 +1743,178 @@ Note entonces que los elementos que tienen el valor de $y = 1$ son aquellos elem
 
 ## c) Entrenamiento de un modelo logístico
 
-Tomando en cuenta los datos construidos en los literales anteriores, vamos a entrenar un modelo de regresión logística.
+Tomando en cuenta los datos construidos en los literales anteriores, vamos a entrenar un modelo de regresión logística, usando $X_1$ y $X_2$ como predictores  para $Y$.
+
+```{r}
+glm_syntetic_quadratic <- glm(y ~ ., data = syntetic_quadratic_train, family = "binomial")
+summary(glm_syntetic_quadratic)
+```
+
+## d) Gráficas de entrenamiento
+
+Ahora apiquemos el modelo al conjunto de entrenamientoy grafiquemos la predicción de la clasificación para este conjunto de datos.
+
+```{r}
+predict_train_syntetic_quadratic <- predict(glm_syntetic_quadratic, syntetic_quadratic_train, type = "response")
+response_predict_train_syntetic_quadratic <- rep(0, nrow(syntetic_quadratic_train))
+response_predict_train_syntetic_quadratic[predict_train_syntetic_quadratic > 0.5] = 1
+
+ggplot(data = data.frame(x1 = syntetic_quadratic_train$x1,
+                              x2 = syntetic_quadratic_train$x2,
+                              y = as.factor(response_predict_train_syntetic_quadratic))) +
+  geom_point(mapping = aes(x = x1, y = x2, color = y)) +
+  labs(x = TeX("X_1"), y = TeX("X_2"), color = "y", title = "Predicciones sobre el conjunto de entrenamiento")
+```
+
+Note entonces que la frontera de clasificación esta en una linea que toma solo dos puntos de la clase 1 y el resto de puntos los toma como clase 0. Claramente, dentro del conjunto de entrenamiento, esto no es una buena clasificación para este conjunto de datos.
+
+La calidad del modelo se verá reflejada en la matriz de confusión sobre el conjunto de evaluación, como se muestra en la siguiente figura.
+
+```{r}
+predict_test_syntetic_quadratic <- predict(glm_syntetic_quadratic, syntetic_quadratic_test, type = "response")
+response_predict_test_syntetic_quadratic <- rep(0, nrow(syntetic_quadratic_test))
+response_predict_test_syntetic_quadratic[predict_test_syntetic_quadratic > 0.5] = 1
+
+glm_test_syntetic_quadratic_class <- tibble(pred = as.factor(response_predict_test_syntetic_quadratic) ,
+                        real = syntetic_quadratic_test$y)
+
+glm_test_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo logístico")
+```
+
+En este punto, la matriz de confusión revela que el modelo tiene especial dificultad en el reconocimiento correcto de datos cuya etiqueta dentro del conjunto de datos es 0, es decir, hay abundancia de falsos negativos.
+
+## e) Entrenamiento de un modelo con transformaciones no lineales
+
+Ahora entrenaremos un modelo aplicando transformaciones no lineales sobre las caracteristicas. En este caso aplicaremos las transformaciones $X_1^2$ y $X_2^2$.
+
+```{r}
+nonlinear_glm_syntetic_quadratic <- glm(y ~ I(x1 ^ 2) + I(x2 ^ 2), data = syntetic_quadratic_train, family = "binomial")
+summary(nonlinear_glm_syntetic_quadratic)
+```
+
+Calculemos la tasa de clasificación correcta para este modelo.
+
+```{r}
+predict_nonlinear_glm_syntetic_quadratic <- predict(nonlinear_glm_syntetic_quadratic, syntetic_quadratic_test, type = "response")
+predict_class_nonlinear_glm_syntetic_quadratic <- rep(0, nrow(syntetic_quadratic_test))
+predict_class_nonlinear_glm_syntetic_quadratic[predict_nonlinear_glm_syntetic_quadratic > 0.5] = 1
+error_glm_nonlinear_syntetic_quadratic <- mean(predict_class_nonlinear_glm_syntetic_quadratic == syntetic_quadratic_test$y)
+error_glm_nonlinear_syntetic_quadratic
+```
+
+Ahora, para realizar una análisis mas profundo, veamos la matriz de confusión para este modelo.
+
+```{r}
+nonlinear_glm_syntetic_quadratic_class <- tibble(
+  pred = as.factor(predict_class_nonlinear_glm_syntetic_quadratic) ,
+  real = syntetic_quadratic_test$y)
+
+nonlinear_glm_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el modelo logístico (con transformaciones no lineales)")
+```
+
+Observemos que la calidad de este modelo tiene un desempeño muy bueno, pues los residuales tienen una media de cero y por otro lado el AIC es menor, en comparación con los residuales de la regresión logística sin transformaciones cuadráticas. Esto demuestra entonces que cuando se tienen separaciones no lineales, se puede alcanzar una calidad muy buena en las predicciones sin recurrir a modelos sofisticados, y tomando en cuenta además que la regresión logística brinda mucha información adicional como por ejemplo, la importancia de las variables, el AIC y otros medidores que ayudan a comprender mas a fondo el problema.
+
+## f) Gráficas sobre el modelo con transformaciones cuadráticas
+
+Con el objetivo de reforzar el razonamiento presentado en el literal anterior, se presentará una gráfica de predicción sobre el conjunto de entrenamiento tomando en cuenta el modelo con las transformaciones sobre las variables propuestas anteriormente.
+
+```{r}
+predict_nonlinear_train_syntetic_quadratic <- predict(nonlinear_glm_syntetic_quadratic, syntetic_quadratic_train, type = "response")
+response_nonlinear_predict_train_syntetic_quadratic <- rep(0, nrow(syntetic_quadratic_train))
+response_nonlinear_predict_train_syntetic_quadratic[predict_nonlinear_train_syntetic_quadratic > 0.5] = 1
+
+ggplot(data = data.frame(x1 = syntetic_quadratic_train$x1,
+                              x2 = syntetic_quadratic_train$x2,
+                              y = as.factor(response_nonlinear_predict_train_syntetic_quadratic))) +
+  geom_point(mapping = aes(x = x1, y = x2, color = y), size = 2, alpha = 0.8) +
+  labs(x = TeX("X_1"), y = TeX("X_2"), color = "y", title = "Predicciones sobre el conjunto de entrenamiento (transformaciones cuadráticas)")
+```
+
+## g) Entrenamiento de un clasificador de soporte vectorial
+
+Con el objetivo de realizar comparaciones con los metodos lineales generalizados presentados anteriormente, se entrenará un clasificador de soporte vectoríal sobre los datos sinteticos con separación no lineal, como se muestra a continuación.
+
+```{r}
+svm_linear_syntetic_quadratic <- svm(y ~ ., data = syntetic_quadratic_train, kernel = "linear", cost = 10, scale = FALSE)
+summary(svm_linear_syntetic_quadratic)
+```
+
+Ahora realicemos una grafica que muestre las fronteras de decisión para este modelo.
+
+```{r}
+plot(svm_linear_syntetic_quadratic, syntetic_quadratic_train)
+```
+
+Note que el modelo no tiene la capacidad de evaluar correctamente la no linealidad dada para dichas clases. Como evidencia de ello, computaremos la tasa de clasificación correcta para este modelo sobre un conjunto de validación.
+
+```{r}
+predict_test_svm_syntetic_quadratic <- predict(svm_linear_syntetic_quadratic, syntetic_quadratic_test)
+error_linear_svm_syntetic_quadratic <- mean(predict_test_svm_syntetic_quadratic == syntetic_quadratic_test$y)
+error_linear_svm_syntetic_quadratic
+```
+
+Ahora veamos cuál es la matriz de confusión para este modelo.
+
+```{r}
+test_svm_syntetic_quadratic_class <- tibble(
+  pred = as.factor(predict_test_svm_syntetic_quadratic) ,
+  real = syntetic_quadratic_test$y)
+
+test_svm_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para el clasificador de soporte vectorial")
+```
+
+
+Note entonces que la calidad del modelo no es muy buena, debido a que es muy similar a tener un modelo de selección aleatoria. Es decir, si se tiene un modelo cuya respuesta es equiprobable para las clases 1 y 0 para toda entrada de $X_1$ y $X_2$, su desempeño va a ser muy similar al modelo presentado actualmente, lo cuál no es muy deseable. Esto se puede confirmar observando que la tasa de clasificación correcta de este modelo es `r error_linear_svm_syntetic_quadratic * 100`%.
+
+## h) Entrenamiento de SVM con kernel no lineal
+
+Ahora con el objetivo de mejorar los resultados sobre el clasificador de soporte vectorial, tomaremos una máquina de soporte vectorial con un kernel no lineal, en particular, tomaremos un kernel polinomial de grado dos, y lo compararemos con respecto al resultado del literal anterior.
+
+```{r}
+svm_nonlinear_syntetic_quadratic <- svm(y ~ ., data = syntetic_quadratic_train, kernel = "polynomial", degree = 2,  cost = 10)
+summary(svm_nonlinear_syntetic_quadratic)
+```
+
+Observemos una gráfica donde muestre las fronteras de decisión con el fin de evaluar la calidad del modelo.
+
+```{r}
+plot(svm_nonlinear_syntetic_quadratic, syntetic_quadratic_train)
+```
+
+Y ahora, calculemos la tasa de clasificación correcta para el modelo con kernel polinomial. Como se muestra a continuación
+
+```{r}
+predict_svm_nonlinear_syntetic_quadratic <- predict(svm_nonlinear_syntetic_quadratic, syntetic_quadratic_test)
+error_nonlinear_svm_syntetic_quadratic <- mean(predict_svm_nonlinear_syntetic_quadratic == syntetic_quadratic_test$y)
+error_nonlinear_svm_syntetic_quadratic
+```
+
+Ahora si observamos la matriz de confusión de este modelo, se vera confirmada la calidad del modelo que se observó en la grafica anterior
+
+```{r}
+svm_nonlinear_syntetic_quadratic_class <- tibble(
+  pred = as.factor(predict_svm_nonlinear_syntetic_quadratic) ,
+  real = syntetic_quadratic_test$y)
+
+svm_nonlinear_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para la máquina de soporte vectorial con kernel no lineal")
+```
+
+
+Note entonces que la calidad de la predicción aumentó en gran medida, y no solo eso, además el modelo toma vectores de soporte mucho mas razonables que en el clasificador de soporte vectorial. Note además que la tasa de clasificación correcta es `r error_nonlinear_svm_syntetic_quadratic * 100`%, la cual es una tasa de clasificación correcta extremadamente buena, obteniendo que el modelo representa correctamente el comportamiento de los datos.
+
+## i) Comentarios y conclusiones
+
+Lo primero que se debe notar es que cuando los modelos no tienen una capacidad de representar una separación no lineal, como en el caso de la regresión logística tradicional y el clasificador de soporte vectorial, todo dependerá entonces del numero de elementos dentro de cada clase. En general, cuando el numero de elementos de cada clase es muy parejo y la distribución en el espacio es relativamente simétrica, el clasificador obtiene un comportamiento de un clasificador aleatorio.
+
+Por otro lado se observa que al dotar a un modelo de capacidad no lineal, este representa muy bien la frontera de decisión. Sin embargo es importante poner a juicio la pregunta: ¿en este caso es mejor un modelo logístico con transformaciones no lineales, o una maquina de soporte vectorial?, y en este caso se considera que es mas recomendable siempre abordar los problemas desde el modelo computacionalmente mas sencillo, el cuál es, el modelo logístico; además es importante resaltar que el modelo logístico brinda mucha mas información respecto a los predictores que la misma maquina de soporte vectorial, sin dejar de lado la simplicidad e interpretabilidad del modelo, pues es importante recordar que este modelo ofrece una interpretabilidad probabilistica, y da la posibilidad de abordar los resultados desde un punto de vista mucho mas estadístico en comparación con el SVM.
+
+# Sección 9.7 - Ejercicio 7
+
