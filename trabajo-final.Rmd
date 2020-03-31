@@ -1752,7 +1752,7 @@ head(syntetic_quadratic)
 Ahora construiremos los conjuntos de entrenamiento y de pruebas para entrenar los posteriores modelos.
 
 ```{r}
-set.seed(16)
+set.seed(8)
 split_ratio <- 0.75
 smp_size <- floor(split_ratio * nrow(syntetic_quadratic))
 train_ind <- sample(seq_len(nrow(syntetic_quadratic)), size = smp_size)
@@ -1808,7 +1808,7 @@ ggplot(data = data.frame(x1 = syntetic_quadratic_train$x1,
   labs(x = TeX("X_1"), y = TeX("X_2"), color = "y", title = "Predicciones sobre el conjunto de entrenamiento")
 ```
 
-Note entonces que la frontera de clasificación esta en una linea que toma solo dos puntos de la clase 1 y el resto de puntos los toma como clase 0. Claramente, dentro del conjunto de entrenamiento, esto no es una buena clasificación para este conjunto de datos.
+Note entonces que la frontera de clasificación esta en una linea que toma solo algunos puntos de la clase 1 y el resto de puntos los toma como clase 0. Claramente, dentro del conjunto de entrenamiento, esto no es una buena clasificación para este conjunto de datos.
 
 La calidad del modelo se verá reflejada en la matriz de confusión sobre el conjunto de evaluación, como se muestra en la siguiente figura.
 
@@ -1817,23 +1817,36 @@ predict_test_syntetic_quadratic <- predict(glm_syntetic_quadratic, syntetic_quad
 response_predict_test_syntetic_quadratic <- rep(0, nrow(syntetic_quadratic_test))
 response_predict_test_syntetic_quadratic[predict_test_syntetic_quadratic > 0.5] = 1
 
-glm_test_syntetic_quadratic_class <- tibble(estimate = as.factor(response_predict_test_syntetic_quadratic),
-                        truth = as.factor(syntetic_quadratic_test$y))
+glm_test_syntetic_quadratic_class <- tibble(truth = as.factor(syntetic_quadratic_test$y), 
+                                            estimate = as.factor(response_predict_test_syntetic_quadratic))
 
 glm_test_syntetic_quadratic_class %>% conf_mat(truth = truth, estimate = estimate) %>% 
   autoplot(type = "heatmap") + 
   labs(title = "Matriz de confusión para el modelo logístico")
+```
 
+En este punto, la matriz de confusión revela que el modelo tiene especial dificultad en el reconocimiento correcto de datos cuya etiqueta dentro del conjunto de datos es 1, es decir, hay abundancia de falsos negativos.
+
+Ahora observemos una curva ROC para este modelo.
+
+```{r}
 roc <- data.frame(
   estimate = glm_test_syntetic_quadratic_class$estimate, 
   truth = glm_test_syntetic_quadratic_class$truth,
   prob = predict_test_syntetic_quadratic)
 
 yardstick::roc_curve(roc, truth, prob) %>% 
-  autoplot()
+  autoplot() +
+  labs(title = "Curva ROC para modelo logístico")
 ```
 
-En este punto, la matriz de confusión revela que el modelo tiene especial dificultad en el reconocimiento correcto de datos cuya etiqueta dentro del conjunto de datos es 0, es decir, hay abundancia de falsos negativos.
+Ahora veamos el AUC para este modelo.
+
+```{r}
+yardstick::roc_auc(roc, truth, prob)
+```
+
+Note entonces que el ROC y el AUC son evidencia de que el modelo no tiene muy buena calidad, pues el AUC es cercano a 0.5 y además la curva ROC es muy cercana a la recta $f(x) = x$, lo que demuestra que el clasificador es muy similar a un clasificador que etiqueta de manera aleatoria uniforme cada una de las filas del conjunto de datos.
 
 ## e) Entrenamiento de un modelo con transformaciones no lineales
 
@@ -1868,6 +1881,27 @@ nonlinear_glm_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pre
 
 Observemos que la calidad de este modelo tiene un desempeño muy bueno, pues los residuales tienen una media de cero y por otro lado el AIC es menor, en comparación con los residuales de la regresión logística sin transformaciones cuadráticas. Esto demuestra entonces que cuando se tienen separaciones no lineales, se puede alcanzar una calidad muy buena en las predicciones sin recurrir a modelos sofisticados, y tomando en cuenta además que la regresión logística brinda mucha información adicional como por ejemplo, la importancia de las variables, el AIC y otros medidores que ayudan a comprender mas a fondo el problema.
 
+Miremos la curva roc para este modelo.
+
+```{r}
+roc <- data.frame(
+  estimate = nonlinear_glm_syntetic_quadratic_class$pred, 
+  truth = nonlinear_glm_syntetic_quadratic_class$real,
+  prob = predict_nonlinear_glm_syntetic_quadratic)
+
+yardstick::roc_curve(roc, truth, prob) %>% 
+  autoplot() +
+  labs(title = "Curva ROC para modelo logístico con transformaciones")
+```
+
+Por otro lado, observemos el AUC para dicho modelo
+
+```{r}
+yardstick::roc_auc(roc, truth, prob)
+```
+
+Note que estas dos fuentes de información reafirman el hecho de que el modelo es muy bueno, pues la curva ROC esta lo mas alejada posible de la recta $f(x) = x$, y su AUC es cercano a 1.
+
 ## f) Gráficas sobre el modelo con transformaciones cuadráticas
 
 Con el objetivo de reforzar el razonamiento presentado en el literal anterior, se presentará una gráfica de predicción sobre el conjunto de entrenamiento tomando en cuenta el modelo con las transformaciones sobre las variables propuestas anteriormente.
@@ -1890,7 +1924,7 @@ ggplot(data = data.frame(x1 = syntetic_quadratic_train$x1,
 Con el objetivo de realizar comparaciones con los metodos lineales generalizados presentados anteriormente, se entrenará un clasificador de soporte vectoríal sobre los datos sinteticos con separación no lineal, como se muestra a continuación.
 
 ```{r}
-svm_linear_syntetic_quadratic <- svm(y ~ ., data = syntetic_quadratic_train, kernel = "linear", cost = 10, scale = FALSE)
+svm_linear_syntetic_quadratic <- svm(y ~ ., data = syntetic_quadratic_train, kernel = "linear", cost = 10, scale = FALSE, probability = TRUE)
 summary(svm_linear_syntetic_quadratic)
 ```
 
@@ -1903,7 +1937,7 @@ plot(svm_linear_syntetic_quadratic, syntetic_quadratic_train)
 Note que el modelo no tiene la capacidad de evaluar correctamente la no linealidad dada para dichas clases. Como evidencia de ello, computaremos la tasa de clasificación correcta para este modelo sobre un conjunto de validación.
 
 ```{r}
-predict_test_svm_syntetic_quadratic <- predict(svm_linear_syntetic_quadratic, syntetic_quadratic_test)
+predict_test_svm_syntetic_quadratic <- predict(svm_linear_syntetic_quadratic, syntetic_quadratic_test, probability = TRUE)
 error_linear_svm_syntetic_quadratic <- mean(predict_test_svm_syntetic_quadratic == syntetic_quadratic_test$y)
 error_linear_svm_syntetic_quadratic
 ```
@@ -1920,15 +1954,35 @@ test_svm_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pred) %>
   labs(title = "Matriz de confusión para el clasificador de soporte vectorial")
 ```
 
-
 Note entonces que la calidad del modelo no es muy buena, debido a que es muy similar a tener un modelo de selección aleatoria. Es decir, si se tiene un modelo cuya respuesta es equiprobable para las clases 1 y 0 para toda entrada de $X_1$ y $X_2$, su desempeño va a ser muy similar al modelo presentado actualmente, lo cuál no es muy deseable. Esto se puede confirmar observando que la tasa de clasificación correcta de este modelo es `r error_linear_svm_syntetic_quadratic * 100`%.
+
+Para confirmar las afirmaciones presentadas en este punto, graficaremos una curva ROC con el fin de observar la calidad del modelo.
+
+```{r}
+roc <- data.frame(
+  estimate = predict_test_svm_syntetic_quadratic, 
+  truth = syntetic_quadratic_test$y,
+  prob = attr(predict_test_svm_syntetic_quadratic,"probabilities")[, "1"])
+
+yardstick::roc_curve(roc, truth, prob) %>% 
+  autoplot() +
+  labs(title = "Curva ROC para el SVC")
+```
+
+Y extraemos su AUC de la siguiente manera. 
+
+```{r}
+yardstick::roc_auc(roc, truth, prob)
+```
+
+Note que esto confirma lo dicho anteriormente, pues la curva ROC es muy cercana a la linea identidad y además su AUC es cercano a 0.5, lo que afirma que el clasificador es similar a un clasificador aleatorio 
 
 ## h) Entrenamiento de SVM con kernel no lineal
 
 Ahora con el objetivo de mejorar los resultados sobre el clasificador de soporte vectorial, tomaremos una máquina de soporte vectorial con un kernel no lineal, en particular, tomaremos un kernel polinomial de grado dos, y lo compararemos con respecto al resultado del literal anterior.
 
 ```{r}
-svm_nonlinear_syntetic_quadratic <- svm(y ~ ., data = syntetic_quadratic_train, kernel = "polynomial", degree = 2,  cost = 10)
+svm_nonlinear_syntetic_quadratic <- svm(y ~ ., data = syntetic_quadratic_train, kernel = "polynomial", degree = 2,  cost = 10, probability = TRUE)
 summary(svm_nonlinear_syntetic_quadratic)
 ```
 
@@ -1941,7 +1995,7 @@ plot(svm_nonlinear_syntetic_quadratic, syntetic_quadratic_train)
 Y ahora, calculemos la tasa de clasificación correcta para el modelo con kernel polinomial. Como se muestra a continuación
 
 ```{r}
-predict_svm_nonlinear_syntetic_quadratic <- predict(svm_nonlinear_syntetic_quadratic, syntetic_quadratic_test)
+predict_svm_nonlinear_syntetic_quadratic <- predict(svm_nonlinear_syntetic_quadratic, syntetic_quadratic_test, probability = TRUE)
 error_nonlinear_svm_syntetic_quadratic <- mean(predict_svm_nonlinear_syntetic_quadratic == syntetic_quadratic_test$y)
 error_nonlinear_svm_syntetic_quadratic
 ```
@@ -1958,8 +2012,28 @@ svm_nonlinear_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pre
   labs(title = "Matriz de confusión para la máquina de soporte vectorial con kernel no lineal")
 ```
 
-
 Note entonces que la calidad de la predicción aumentó en gran medida, y no solo eso, además el modelo toma vectores de soporte mucho mas razonables que en el clasificador de soporte vectorial. Note además que la tasa de clasificación correcta es `r error_nonlinear_svm_syntetic_quadratic * 100`%, la cual es una tasa de clasificación correcta extremadamente buena, obteniendo que el modelo representa correctamente el comportamiento de los datos.
+
+Ahora para confirmar que la calidad del modelo es buena, grafiquemos la curva ROC.
+
+```{r}
+roc <- data.frame(
+  estimate = predict_svm_nonlinear_syntetic_quadratic, 
+  truth = syntetic_quadratic_test$y,
+  prob = attr(predict_svm_nonlinear_syntetic_quadratic,"probabilities")[, "1"])
+
+yardstick::roc_curve(roc, truth, prob) %>% 
+  autoplot() +
+  labs(title = "Curva ROC para la SVM con kernel no lineal")
+```
+
+Note entonces que si computamos el AUC para este modelo se obtiene lo siguiente.
+
+```{r}
+roc_auc(roc, truth, prob)
+```
+
+Se puede concluir a partir del AUC, que por una poca diferencia, el modelo logístico se desempeñó mucho mejor para este caso pues su valor es mas cercano a 1 que el valor mostrado anteriormente, aunque en la práctica no ofrece mucha diferencia ambas calificaciones.
 
 ## i) Comentarios y conclusiones
 
@@ -1989,7 +2063,7 @@ auto <- auto %>% mutate(
 )
 
 # Retiramos la variable mpg
-auto <- auto %>% dplyr::select(-mpg)
+auto_fit <- auto %>% dplyr::select(-mpg, -name)
 head(auto)
 ```
 
@@ -2005,7 +2079,7 @@ Construyamos un clasificador de soporte vectorial y observemos varios valores pa
 
 ```{r}
 set.seed(20)
-tune_svc <- tune(svm, mpg01 ~ . - name, data = auto, kernel = "linear", 
+tune_svc <- tune(svm, mpg01 ~ ., data = auto_fit, kernel = "linear", 
                  ranges = list(cost = seq(from = 0.01, to = 5, by = 0.1)))
 summary(tune_svc)
 ```
@@ -2035,7 +2109,7 @@ A continuación entrenaremos un modelo con kernel polinomial y buscaremos el mej
 
 ```{r}
 set.seed(20)
-tune_svm_polynomial <- tune(svm, mpg01 ~ . - name, data = auto, kernel = "polynomial", probability = TRUE,
+tune_svm_polynomial <- tune(svm, mpg01 ~ ., data = auto_fit, kernel = "polynomial", probability = TRUE,
                  ranges = list(cost = seq(from = 0.01, to = 5, by = 0.2), 
                                degree = seq(from = 2, to = 10, by = 1)))
 ```
@@ -2053,15 +2127,9 @@ fig <- plot_ly(data = tune_svm_polynomial$performances, x=~cost,y=~degree, z=~ -
 fig %>% colorbar(title = "-1/(Error ^ 2)")
 ```
 
-Esta figura se puede observar que es una mala estrategia tomar valores para el grado del polinomio mucho más altos, aunque se pensaría que estos expresan una variedad mayor de funciones porque tienen muchos grados de libertad, es precisamente esto lo que causa que el modelo se sobreajuste a los datos de entrenamiento, por tanto, en este caso es mejor tomar valores del grado del polinomio mucho mas bajos para obtener un modelo que logre ser lo más general posible para los datos considerados.
+***Nota:*** En esta figura no se graficó el error $E$ neto como lo presentan los modelos, pues en este caso la gráfica no expresa de manera clara los diferentes niveles para algunas regiones, por tanto se gráfica en realidad $-1/E^2$, con el fin de observar de mejor manera el comportamiento del error en este caso.
 
-```{r}
-predictions <- predict(tune_svm_polynomial$best.model, auto_test, probability = TRUE)
-roc <- tibble(estimate = predictions, 
-              truth = auto_test$mpg01,
-              prob = attr(predictions,"probabilities")[,2])
-roc_curve(roc, truth, prob) %>% autoplot()
-```
+Esta figura se puede observar que es una mala estrategia tomar valores para el grado del polinomio mucho más altos, aunque se pensaría que estos expresan una variedad mayor de funciones porque tienen muchos grados de libertad, es precisamente esto lo que causa que el modelo se sobreajuste a los datos de entrenamiento, por tanto, en este caso es mejor tomar valores del grado del polinomio mucho mas bajos para obtener un modelo que logre ser lo más general posible para los datos considerados.
 
 ### SVM con kernel radial
 
@@ -2069,7 +2137,7 @@ Ahora, entrenemos una maquina de soporte vectorial con un kernel radial. Para el
 
 ```{r}
 set.seed(20)
-tune_svm_radial <- tune(svm, mpg01 ~ . - name, data = auto, kernel = "radial", 
+tune_svm_radial <- tune(svm, mpg01 ~ ., data = auto_fit, kernel = "radial", 
                  ranges = list(cost = seq(from = 0.01, to = 5, by = 0.3), 
                                gamma = seq(from = 0.01, to = 1, by = 0.02)))
 ```
@@ -2086,8 +2154,181 @@ fig <- plot_ly(data = tune_svm_radial$performances, x=~cost,y=~gamma, z=~ -1/(er
 fig %>% colorbar(title = "-1/(Error ^ 2)")
 ```
 
-Esta gráfica demuestra que el modelo es altamente sensible al costo, al contrario del parrametro $\gamma$ que no ofrece una variabilidad tan alta. Es decir, note que el error solo cambia en gran medida si el costo cambia es demasiado pequeño; si se toma un costo muy pequeño, se obtendrá un error alto sin importar si $\gamma$ se mueve en un rango bastante amplio. Otra conclusión que se puede extraer es que si tomamos un costo mayor a 0.31, y seleccionamos algún valor para $\gamma$ entre 0 y 1, se obtienen valores del error con un cambio pequeño.
+***Nota:*** En esta figura no se graficó el error $E$ neto como lo presentan los modelos, pues en este caso la gráfica no expresa de manera clara los diferentes niveles para algunas regiones, por tanto se gráfica en realidad $-1/E^2$, con el fin de observar de mejor manera el comportamiento del error en este caso.
+
+Esta gráfica demuestra que el modelo es altamente sensible al costo, al contrario del parrametro $\gamma$ que no ofrece una variabilidad tan alta. Es decir, note que el error solo cambia en gran medida si el costo es demasiado pequeño; si se toma un costo muy pequeño, se obtendrá un error alto sin importar si $\gamma$ se mueve en un rango bastante amplio. Otra conclusión que se puede extraer es que si tomamos un costo mayor a 0.31, y seleccionamos algún valor para $\gamma$ entre 0 y 1, se obtienen valores del error con un cambio pequeño.
+
+## d) Gráficas
+
+De acuerdo a la gráfica de correlaciones presentada al inicio de la sección, se puede observar que la interacción de los caballos de fuerza del automovil tienen una interacción notoría con las demás variables y a su vez muestra una tendencia marcada al diferenciar los datos para cada una de las clases de la variable `mpg01`. En vista de ello, centraremos nuestro análisis en tomar la variable `horsepower`y compararla con las variables que ofrecen mas información.
+
+Para este análisis comprararemos la variable `horsepower` con otras tres variables, las cuales son `acceleration`, `displacement` y `weight`, observando allí las 
+
+### SVM con kernel lineal 
+
+```{r}
+plot(tune_svc$best.model, auto_fit, horsepower ~ acceleration, 
+     slice = list(year = median(auto_fit$year), 
+                  cylinders = median(auto_fit$cylinders), 
+                  displacement = median(auto_fit$displacement), 
+                  weight = median(auto_fit$weight),
+                  origin = 1))
+```
+
+```{r}
+plot(tune_svc$best.model, auto_fit, horsepower ~ displacement, 
+     slice = list(year = median(auto_fit$year), 
+                  cylinders = median(auto_fit$cylinders), 
+                  acceleration = median(auto_fit$acceleration), 
+                  weight = median(auto_fit$weight),
+                  origin = 1))
+```
+
+```{r}
+plot(tune_svc$best.model, auto_fit, horsepower ~ weight, 
+     slice = list(year = median(auto_fit$year), 
+                  acceleration = median(auto_fit$acceleration), 
+                  displacement = median(auto_fit$displacement), 
+                  cylinders = median(auto_fit$cylinders),
+                  origin = 1))
+```
+
+### SVM con kernel polinomial 
+
+```{r}
+plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ acceleration, 
+     slice = list(year = median(auto_fit$year), 
+                  cylinders = median(auto_fit$cylinders), 
+                  displacement = median(auto_fit$displacement), 
+                  weight = median(auto_fit$weight),
+                  origin = 1))
+```
+
+```{r}
+plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ weight, 
+     slice = list(year = median(auto_fit$year), 
+                  acceleration = median(auto_fit$acceleration), 
+                  displacement = median(auto_fit$displacement), 
+                  cylinders = median(auto_fit$cylinders),
+                  origin = 1))
+```
 
 
+```{r}
+plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ displacement, 
+     slice = list(year = median(auto_fit$year), 
+                  cylinders = median(auto_fit$cylinders), 
+                  acceleration = median(auto_fit$acceleration), 
+                  weight = median(auto_fit$weight),
+                  origin = 1))
+```
 
+
+### SVM con kernel radial 
+
+```{r}
+plot(tune_svm_radial$best.model, auto_fit, horsepower ~ acceleration, 
+     slice = list(year = median(auto_fit$year), 
+                  cylinders = median(auto_fit$cylinders), 
+                  displacement = median(auto_fit$displacement), 
+                  weight = median(auto_fit$weight),
+                  origin = 1))
+```
+
+
+```{r}
+plot(tune_svm_radial$best.model, auto_fit, horsepower ~ weight, 
+     slice = list(year = median(auto_fit$year), 
+                  acceleration = median(auto_fit$acceleration), 
+                  displacement = median(auto_fit$displacement), 
+                  cylinders = median(auto_fit$cylinders),
+                  origin = 1))
+```
+
+
+```{r}
+plot(tune_svm_radial$best.model, auto_fit, horsepower ~ displacement, 
+     slice = list(year = median(auto_fit$year), 
+                  cylinders = median(auto_fit$cylinders), 
+                  acceleration = median(auto_fit$acceleration), 
+                  weight = median(auto_fit$weight),
+                  origin = 1))
+```
+
+### Curvas ROC y AUC
+
+```{r}
+split_ratio <- 0.75
+smp_size <- floor(split_ratio * nrow(auto_fit))
+train_ind <- sample(seq_len(nrow(auto_fit)), size = smp_size)
+
+auto_fit_train <- auto_fit[train_ind, ]
+auto_fit_test <- auto_fit[-train_ind, ]
+```
+
+```{r}
+svm_linear <- svm(mpg01 ~ ., 
+                  data = auto_fit_train, 
+                  cost = tune_svc$best.parameters$cost, 
+                  kernel = "linear",
+                  probability = TRUE)
+
+svm_linear_test <- predict(svm_linear, auto_fit_test, probability = TRUE)
+
+roc_linear <- data.frame(
+  estimate = svm_linear_test, 
+  truth = auto_fit_test$mpg01,
+  prob = attr(svm_linear_test,"probabilities")[, "1"],
+  Modelo = "Lineal")
+```
+
+```{r}
+svm_poly <- svm(mpg01 ~ ., 
+                  data = auto_fit_train, 
+                  cost = tune_svm_polynomial$best.parameters$cost,
+                  degree = tune_svm_polynomial$best.parameters$degree,
+                  kernel = "polynomial",
+                  probability = TRUE)
+
+svm_poly_test <- predict(svm_poly, auto_fit_test, probability = TRUE)
+
+roc_poly <- data.frame(
+  estimate = svm_poly_test, 
+  truth = auto_fit_test$mpg01,
+  prob = attr(svm_poly_test,"probabilities")[, "1"], 
+  Modelo = "Polinomial")
+```
+
+```{r}
+svm_radial <- svm(mpg01 ~ ., 
+                  data = auto_fit_train, 
+                  cost = tune_svm_radial$best.parameters$cost,
+                  gamma = tune_svm_radial$best.parameters$gamma,
+                  kernel = "radial",
+                  probability = TRUE)
+
+svm_radial_test <- predict(svm_radial, auto_fit_test, probability = TRUE)
+
+roc_radial <- data.frame(
+  estimate = svm_radial_test, 
+  truth = auto_fit_test$mpg01,
+  prob = attr(svm_radial_test,"probabilities")[, "1"],
+  Modelo = "Radial")
+```
+
+```{r}
+roc_merge <- rbind(roc_linear, roc_poly, roc_radial)
+
+roc_merge %>% 
+  group_by(Modelo) %>% 
+  roc_curve(truth, prob) %>% 
+  autoplot() +
+  labs(title = "Curvas ROC")
+```
+
+```{r}
+roc_merge %>% 
+  group_by(Modelo) %>% 
+  roc_auc(truth, prob)
+```
 
