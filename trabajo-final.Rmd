@@ -1229,15 +1229,15 @@ hitters_train
 hitters_test
 ```
 
-## c) Aplicación de *boosting* y determinación del parametro $\lambda$ de contracción
+## c) Aplicación de *boosting* y determinación del parametro $\lambda$ de contracción sobre el conjunto de entrenamiento.
 
-En esta sección realizaremos *boosting* y calcularemos el mejor parámetro de contracción $\lambda$ sobre un determinado rango. Para esto, crearemos una función que calcule el $MSE$ recibiendo $\lambda$ como parámetro.
+En esta sección realizaremos *boosting* y calcularemos el mejor parámetro de contracción $\lambda$ sobre un determinado rango. Para esto, crearemos una función que calcule el $MSE$ sobre el conjunto de entrenamiento recibiendo $\lambda$ como parámetro.
 
 ```{r}
-get_mse_boosting <- function(lambda, train, test) {
+get_mse_boosting_train <- function(lambda, train) {
   test_gbm <- gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = lambda)
-  predict_test <- predict(test_gbm, newdata = test, n.trees = 1000)
-  error <- mean((predict_test - test$Salary) ^ 2)
+  predict_train <- predict(test_gbm, newdata = train, n.trees = 1000)
+  error <- mean((predict_train - train$Salary) ^ 2)
   return(error)
 }
 ```
@@ -1246,22 +1246,59 @@ Ahora definamos el rango sobre el cual se quiere graficar los $MSE$, y realicemo
 
 ```{r}
 lambda_values = seq(0.01, 1, by = 0.01)
-mse_values_hitters <- sapply(lambda_values, get_mse_boosting, hitters_train, hitters_test)
+mse_train_values_hitters <- sapply(lambda_values, get_mse_boosting_train, hitters_train)
 
-lambda_mse_values_df <- data.frame(lambda_values, mse_values = mse_values_hitters)
+lambda_mse_train_values_df <- data.frame(lambda_values, mse_values = mse_train_values_hitters)
 
-best_lambda_boosting <- lambda_mse_values_df[which(lambda_mse_values_df$mse_values == min(lambda_mse_values_df$mse_values)), "lambda_values"]
+best_lambda_train_boosting <- lambda_mse_train_values_df[which(lambda_mse_train_values_df$mse_values == min(lambda_mse_train_values_df$mse_values)), "lambda_values"]
 
-best_mse_boosting <- min(lambda_mse_values_df$mse_values)
+best_mse_train_boosting <- min(lambda_mse_train_values_df$mse_values)
 
-ggplot(data = lambda_mse_values_df) +
+ggplot(data = lambda_mse_train_values_df) +
   geom_line(mapping = aes(x = lambda_values, y = mse_values)) +
-  labs(x = TeX("$\\lambda$"), y = "MSE")
+  labs(x = TeX("$\\lambda$"), y = "MSE de entrenamiento", title = "MSE de entrenamiento para diferentes valores de contracción") +
+  theme_economist()
 ```
 
-En esta gráfica se puede apreciar que el mejor valor para $\lambda$ es `r best_lambda_boosting` con el cual se obtiene un $MSE$ de `r best_mse_boosting`.
+En esta gráfica se puede apreciar que el mejor valor para $\lambda$ es `r best_lambda_train_boosting` con el cual se obtiene un $MSE$ de `r best_mse_train_boosting`.
 
-## d) Comparación de *boosting* con métodos previos
+## d) Determinación del parametro $\lambda$ de contracción sobre el conjunto de prueba
+
+Ahora graficaremos el $MSE$ de validación para diferentes valores de $\lambda$ y analizaremos cual de ellos obtiene un valor mas apropiado.
+
+Para ello, primero debemos construir una función que permita calcular el $MSE$ de validación para un determinado valor de $\lambda$, 
+
+```{r}
+get_mse_boosting_test <- function(lambda, train, test) {
+  test_gbm <- gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = lambda)
+  predict_test <- predict(test_gbm, newdata = test, n.trees = 1000)
+  error <- mean((predict_test - test$Salary) ^ 2)
+  return(error)
+}
+```
+
+Ahora grafiquemos el correspondiente valor del $MSE$ para cada uno de los posibles valores de $\lambda$ seleccionados.
+
+```{r}
+mse_test_values_hitters <- sapply(lambda_values, get_mse_boosting_test, hitters_train, hitters_test)
+
+lambda_test_mse_values_df <- data.frame(lambda_values, mse_values = mse_test_values_hitters)
+
+best_lambda_test_boosting <- lambda_test_mse_values_df[which(lambda_test_mse_values_df$mse_values == min(lambda_test_mse_values_df$mse_values)), "lambda_values"]
+
+best_mse_test_boosting <- min(lambda_test_mse_values_df$mse_values)
+
+ggplot(data = lambda_test_mse_values_df) +
+  geom_line(mapping = aes(x = lambda_values, y = mse_values)) +
+  labs(x = TeX("$\\lambda$"), y = "MSE de validación", title = "MSE de validación para diferentes valores de contracción") +
+  theme_economist()
+```
+
+Note entonces que el mejor valor para $\lambda$ es `r best_lambda_test_boosting`, del cual se obtiene un valor para el $MSE$ de validación de `r best_mse_test_boosting`.
+
+Como conclusión respecto a los valore encontrados en la gráfica del literal anterior, se puede observar entonces que al aumentar el $\lambda$, el $MSE$ de entrenamiento desciende ya que el algoritmo de optimización pretende minimizar el $MSE$ de los datos con el cual se entrena el modelo. Pero algo muy interesante que hay que notar, es que contrario a lo que pasa en el conjunto de entrenamiento, el $MSE$ de validación aumenta a medida que aumentamos $\lambda$, lo que sugiere que hay un sobreajuste del modelo para valores de $\lambda$ cercanos a 1 o mayores. Esto muestra que juzgar un modelo mediante un conjunto de entrenamiento no es adecuado, pues pueden haber parámetros que no esten generalizando bien el comportamiento real de los datos.
+
+## e) Comparación de *boosting* con métodos previos
 
 En esta sección compararemos el $MSE$ de boosting respecto a otros métodos vistos ateriormente como regresión lineal múltiple y regresión de componentes principales.
 
@@ -1296,7 +1333,7 @@ Finalmente, concluimos que en este caso el boosting no era la mejor opción, pue
 Ahora observaremos cual es la improtancia de las variables respecto a este método. Para ello entrenemos el modelo con el mejor lambda obtenido y analicemos la tabla de importancias.
 
 ```{r}
-gbm_hitters <- gbm(Salary ~ ., data = hitters_train, distribution = "gaussian", n.trees = 1000, shrinkage = best_lambda_boosting)
+gbm_hitters <- gbm(Salary ~ ., data = hitters_train, distribution = "gaussian", n.trees = 1000, shrinkage = best_mse_test_boosting)
 summary(gbm_hitters)
 ```
 
@@ -1589,7 +1626,8 @@ Grafiquemos el conjunto de datos generado.
 ggplot(data = syntetic_df) +
   geom_point(mapping = aes(x = x1, y = x2, color = Class)) +
   geom_circle(mapping = aes(x0 = 0.5, y0 = 0.5, r = radius)) +
-  labs(x = TeX("$X_1$"), y = TeX("$X_2$"))
+  theme_economist() +
+  labs(x = TeX("$X_1$"), y = TeX("$X_2$"), title = "Datos sintéticos")
 ```
 
 Ahora dividiremos el conjunto de datos en un conjunto para entrenamiento y otro conjunto para validación, de la siguiente manera.
@@ -1734,7 +1772,8 @@ Ahora veamos una gráfica del conjunto de datos para visualizar la separación d
 ```{r}
 g <- ggplot(data = syntetic_quadratic) + 
   geom_point(mapping = aes(x = x1, y = x2, color = y)) +
-  labs(x = "X1", y = "X2", color = "y", title = "Conjunto de datos sintéticos")
+  labs(x = "X1", y = "X2", color = "y", title = "Conjunto de datos sintéticos") +
+  theme_economist()
 
 ggplotly(g)
 ```
@@ -1746,6 +1785,7 @@ Note entonces que los elementos que tienen el valor de $y = 1$ son aquellos elem
 Tomando en cuenta los datos construidos en los literales anteriores, vamos a entrenar un modelo de regresión logística, usando $X_1$ y $X_2$ como predictores  para $Y$.
 
 ```{r}
+set.seed(16)
 glm_syntetic_quadratic <- glm(y ~ ., data = syntetic_quadratic_train, family = "binomial")
 summary(glm_syntetic_quadratic)
 ```
@@ -1755,6 +1795,7 @@ summary(glm_syntetic_quadratic)
 Ahora apiquemos el modelo al conjunto de entrenamientoy grafiquemos la predicción de la clasificación para este conjunto de datos.
 
 ```{r}
+set.seed(16)
 predict_train_syntetic_quadratic <- predict(glm_syntetic_quadratic, syntetic_quadratic_train, type = "response")
 response_predict_train_syntetic_quadratic <- rep(0, nrow(syntetic_quadratic_train))
 response_predict_train_syntetic_quadratic[predict_train_syntetic_quadratic > 0.5] = 1
@@ -1763,6 +1804,7 @@ ggplot(data = data.frame(x1 = syntetic_quadratic_train$x1,
                               x2 = syntetic_quadratic_train$x2,
                               y = as.factor(response_predict_train_syntetic_quadratic))) +
   geom_point(mapping = aes(x = x1, y = x2, color = y)) +
+  theme_economist() +
   labs(x = TeX("X_1"), y = TeX("X_2"), color = "y", title = "Predicciones sobre el conjunto de entrenamiento")
 ```
 
@@ -1775,12 +1817,20 @@ predict_test_syntetic_quadratic <- predict(glm_syntetic_quadratic, syntetic_quad
 response_predict_test_syntetic_quadratic <- rep(0, nrow(syntetic_quadratic_test))
 response_predict_test_syntetic_quadratic[predict_test_syntetic_quadratic > 0.5] = 1
 
-glm_test_syntetic_quadratic_class <- tibble(pred = as.factor(response_predict_test_syntetic_quadratic) ,
-                        real = syntetic_quadratic_test$y)
+glm_test_syntetic_quadratic_class <- tibble(estimate = as.factor(response_predict_test_syntetic_quadratic),
+                        truth = as.factor(syntetic_quadratic_test$y))
 
-glm_test_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pred) %>% 
+glm_test_syntetic_quadratic_class %>% conf_mat(truth = truth, estimate = estimate) %>% 
   autoplot(type = "heatmap") + 
   labs(title = "Matriz de confusión para el modelo logístico")
+
+roc <- data.frame(
+  estimate = glm_test_syntetic_quadratic_class$estimate, 
+  truth = glm_test_syntetic_quadratic_class$truth,
+  prob = predict_test_syntetic_quadratic)
+
+yardstick::roc_curve(roc, truth, prob) %>% 
+  autoplot()
 ```
 
 En este punto, la matriz de confusión revela que el modelo tiene especial dificultad en el reconocimiento correcto de datos cuya etiqueta dentro del conjunto de datos es 0, es decir, hay abundancia de falsos negativos.
@@ -1831,6 +1881,7 @@ ggplot(data = data.frame(x1 = syntetic_quadratic_train$x1,
                               x2 = syntetic_quadratic_train$x2,
                               y = as.factor(response_nonlinear_predict_train_syntetic_quadratic))) +
   geom_point(mapping = aes(x = x1, y = x2, color = y), size = 2, alpha = 0.8) +
+  theme_economist() +
   labs(x = TeX("X_1"), y = TeX("X_2"), color = "y", title = "Predicciones sobre el conjunto de entrenamiento (transformaciones cuadráticas)")
 ```
 
@@ -1917,4 +1968,126 @@ Lo primero que se debe notar es que cuando los modelos no tienen una capacidad d
 Por otro lado se observa que al dotar a un modelo de capacidad no lineal, este representa muy bien la frontera de decisión. Sin embargo es importante poner a juicio la pregunta: ¿en este caso es mejor un modelo logístico con transformaciones no lineales, o una maquina de soporte vectorial?, y en este caso se considera que es mas recomendable siempre abordar los problemas desde el modelo computacionalmente mas sencillo, el cuál es, el modelo logístico; además es importante resaltar que el modelo logístico brinda mucha mas información respecto a los predictores que la misma maquina de soporte vectorial, sin dejar de lado la simplicidad e interpretabilidad del modelo, pues es importante recordar que este modelo ofrece una interpretabilidad probabilistica, y da la posibilidad de abordar los resultados desde un punto de vista mucho mas estadístico en comparación con el SVM.
 
 # Sección 9.7 - Ejercicio 7
+
+En este caso, usaremos un SVM con el fin de predecir en qué momento un carro tiene alto o bajo consumo de combustible en el conjunto de datos `Auto`, considerando cuándo el consumo está por encima o por debajo de la mediana.
+
+## a) Preparación del conjunto de datos
+
+Inicialmente crearemos una variable binaria que tomará el valor de 1 cuando el consumo de combustible está por encima de la media y tomará un valor de 0 en caso contrario.
+
+```{r}
+auto <- as_tibble(Auto)
+median_mpg <- median(auto$mpg)
+
+auto <- auto %>% mutate(
+  mpg01 = case_when(
+    mpg >= median_mpg ~ 1,
+    mpg < median_mpg ~ 0
+  ),
+  mpg01 = as.factor(mpg01),
+  origin = as.factor(origin)
+)
+
+# Retiramos la variable mpg
+auto <- auto %>% dplyr::select(-mpg)
+head(auto)
+```
+
+Ahora observemos una gráfica descriptiva de los datos.
+
+![](plots/auto-plot.png)
+
+Al notar la imágen anterior, se puede observar que muchas de las variables tienen una separación notoria. Si las separaciones son lineales, es posible trazar hiperplanos que separen los datos de manera adecuada, sobre todo en las variables `displacement`, `weight` y `cilinders`
+
+## b) Clasificador de soporte vectorial
+
+Construyamos un clasificador de soporte vectorial y observemos varios valores para la varible `cost` usando validación cruzada, para ello consideremos el siguiente codigo, y extraigamos el mejor clasificador con respecto a la variable `cost`.
+
+```{r}
+set.seed(20)
+tune_svc <- tune(svm, mpg01 ~ . - name, data = auto, kernel = "linear", 
+                 ranges = list(cost = seq(from = 0.01, to = 5, by = 0.1)))
+summary(tune_svc)
+```
+
+Notemos entonces que el mejor modelo corresponde a aquel que posee un costo de `r tune_svc$best.parameters$cost`, obteniendo asi un error de `r tune_svc$best.performance`. Sin embargo, es interesante observar como se comporta el error respecto a la variable costo de manera gráfica para los valores probados.
+
+```{r}
+g <- ggplot(data = tune_svc$performances) +
+  geom_line(mapping = aes(x = cost, y = error)) +
+  theme_economist() +
+  labs(title = "Errores respecto al costo", x = "Costo", y = "Error")
+
+ggplotly(g)
+```
+
+Note pues que se pudo tomar cualquier costo entre 1.41 y 3.21 y se hubiera obtenido el mismo resultado.
+
+El desempeño del modelo tiene una buena calidad, pues reporta una tasa de clasificación correcta de `r tune_svc$best.performance * 100`%. Es posible que este resultado haya sido debido a que en la gráfica descriptiva, se noto una clara tendencia de múltiples variables al resaltarlas para cada una de las clases, y es posible que el modelo haya detectado y expresado de manera correcta dicha separación.
+
+## c) SVM con kernel no lineal
+
+Ahora encontremos un modelo óptimo para este conjunto de datos usando un modelo SVM con kernel no lineal. Primero, usaremos un modelo con un kernel polinomial y extraeremos el mejor modelo probando sobre varios grados del polinomio; posteriormente, probaremos con una maquina de soporte vectorial con kernel radial y encontraremos el mejor modelo para varios valores de $\gamma$. En ambos modelos, se buscará un valor adecuado para el costo.
+
+### SVM con kernel polinomial
+
+A continuación entrenaremos un modelo con kernel polinomial y buscaremos el mejor modelo usando validación cruzada para encontrar el mejor valor para el grado del polinomio.
+
+```{r}
+set.seed(20)
+tune_svm_polynomial <- tune(svm, mpg01 ~ . - name, data = auto, kernel = "polynomial", probability = TRUE,
+                 ranges = list(cost = seq(from = 0.01, to = 5, by = 0.2), 
+                               degree = seq(from = 2, to = 10, by = 1)))
+```
+
+Se obtiene que el mejor modelo tiene un grado `r tune_svm_polynomial$best.parameters$degree` y un costo de `r tune_svm_polynomial$best.parameters$cost`, para así obtener un tasa de error de clasificación de `r tune_svm_polynomial$best.performance * 100`%, el cual es levemente mejor que la maquina de soporte vectorial con kernel lineal.
+
+Realicemos una gráfica para observar el comportamiento del error respecto al costo y al grado
+
+```{r}
+fig <- plot_ly(data = tune_svm_polynomial$performances, x=~cost,y=~degree, z=~ -1/(error ^ 2), type = "contour", colorscale='Jet') %>% 
+  layout(
+    xaxis = list(title = "Costo"),
+    yaxis = list(title = "Grado del polinomio"),
+    title = "Gráfica sobre el ")
+fig %>% colorbar(title = "-1/(Error ^ 2)")
+```
+
+Esta figura se puede observar que es una mala estrategia tomar valores para el grado del polinomio mucho más altos, aunque se pensaría que estos expresan una variedad mayor de funciones porque tienen muchos grados de libertad, es precisamente esto lo que causa que el modelo se sobreajuste a los datos de entrenamiento, por tanto, en este caso es mejor tomar valores del grado del polinomio mucho mas bajos para obtener un modelo que logre ser lo más general posible para los datos considerados.
+
+```{r}
+predictions <- predict(tune_svm_polynomial$best.model, auto_test, probability = TRUE)
+roc <- tibble(estimate = predictions, 
+              truth = auto_test$mpg01,
+              prob = attr(predictions,"probabilities")[,2])
+roc_curve(roc, truth, prob) %>% autoplot()
+```
+
+### SVM con kernel radial
+
+Ahora, entrenemos una maquina de soporte vectorial con un kernel radial. Para ello encontraremos los mejores parámetros para el costo y para $\gamma$.
+
+```{r}
+set.seed(20)
+tune_svm_radial <- tune(svm, mpg01 ~ . - name, data = auto, kernel = "radial", 
+                 ranges = list(cost = seq(from = 0.01, to = 5, by = 0.3), 
+                               gamma = seq(from = 0.01, to = 1, by = 0.02)))
+```
+
+En este caso, los mejores parámetros encontrados que minimizan la tasa de error de clasificación corresponden a $\gamma$ con un valor de `r tune_svm_radial$best.parameters$gamma` y un costo de `r tune_svm_radial$best.parameters$cost`, para así obtener una tasa de clasificación erronea de `r tune_svm_radial$best.performance * 100`%.
+
+Ahora, con el objetivo de visualizar como varía el error de acuerdo a $\gamma$ y el costo, veamos la siguiente gráfica.
+
+```{r}
+fig <- plot_ly(data = tune_svm_radial$performances, x=~cost,y=~gamma, z=~ -1/(error ^ 2), type = "contour", colorscale='Jet') %>% 
+  layout(
+    xaxis = list(title = "Costo"),
+    yaxis = list(title = "Gamma"))
+fig %>% colorbar(title = "-1/(Error ^ 2)")
+```
+
+Esta gráfica demuestra que el modelo es altamente sensible al costo, al contrario del parrametro $\gamma$ que no ofrece una variabilidad tan alta. Es decir, note que el error solo cambia en gran medida si el costo cambia es demasiado pequeño; si se toma un costo muy pequeño, se obtendrá un error alto sin importar si $\gamma$ se mueve en un rango bastante amplio. Otra conclusión que se puede extraer es que si tomamos un costo mayor a 0.31, y seleccionamos algún valor para $\gamma$ entre 0 y 1, se obtienen valores del error con un cambio pequeño.
+
+
+
 
