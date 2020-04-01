@@ -2162,9 +2162,11 @@ Esta gráfica demuestra que el modelo es altamente sensible al costo, al contrar
 
 De acuerdo a la gráfica de correlaciones presentada al inicio de la sección, se puede observar que la interacción de los caballos de fuerza del automovil tienen una interacción notoría con las demás variables y a su vez muestra una tendencia marcada al diferenciar los datos para cada una de las clases de la variable `mpg01`. En vista de ello, centraremos nuestro análisis en tomar la variable `horsepower`y compararla con las variables que ofrecen mas información.
 
-Para este análisis comprararemos la variable `horsepower` con otras tres variables, las cuales son `acceleration`, `displacement` y `weight`, observando allí las 
+Para este análisis comprararemos la variable `horsepower` con otras tres variables, las cuales son `acceleration`, `displacement` y `weight`, observando allí como actua cada uno de los modelos. Es importante aclarar que en cada una de las graficas se tomo una tajada (o **slice**) justo en la mediana de cada una de las variables restantes.
 
 ### SVM con kernel lineal 
+
+Inicialmente si observemos las gráficas de las maquinas de soporte vectorial para cada pareja de variables. A continuación mostraremos la gráfica de la maquina de soporte vectorial para las variables `horsepower` y `acceleration`.
 
 ```{r}
 plot(tune_svc$best.model, auto_fit, horsepower ~ acceleration, 
@@ -2175,6 +2177,10 @@ plot(tune_svc$best.model, auto_fit, horsepower ~ acceleration,
                   origin = 1))
 ```
 
+En este caso, note que la maquina de soporte vectorial reconoce muy bien la separación mostrada en este par de variables, por tanto la maquina de soporte vectorial con kernel lineal se muestra efectiva en esta situación.
+
+Ahora grafiquemos las variables `horsepower` y `displacement` y observemos la frontera de decisión en este caso.
+
 ```{r}
 plot(tune_svc$best.model, auto_fit, horsepower ~ displacement, 
      slice = list(year = median(auto_fit$year), 
@@ -2183,6 +2189,10 @@ plot(tune_svc$best.model, auto_fit, horsepower ~ displacement,
                   weight = median(auto_fit$weight),
                   origin = 1))
 ```
+
+Se encuentra entonces que hay ciertos carros cuyo consumo de combustible está por debajo de la mediana pero aún así aparecen clasificados como autos con alto consumo. Esto puede ocurrir debido al gran peso estadístico que ofrecen los datos para la clase de los automoviles de alto consumo.
+
+Finalmente para este modelo, grafiquemos la frontera de decisión para las variables `horsepower` y `weight`.
 
 ```{r}
 plot(tune_svc$best.model, auto_fit, horsepower ~ weight, 
@@ -2193,7 +2203,13 @@ plot(tune_svc$best.model, auto_fit, horsepower ~ weight,
                   origin = 1))
 ```
 
+Este caso es interesante, pues note que la separación lineal es razonablemente adecuada considerando que estamos en un caso no separable, y aún así el modelo se comporta de la manera esperada clasificando correctamente a la mayoría de los datos.
+
 ### SVM con kernel polinomial 
+
+En esta sección, consideraremos las mismas parejas que se mostraron en el análisis anterior para una maquina de soporte vectorial con un kernel polinomial de grado 3.
+
+Para las variables `horsepower` y `acceleration` se tiene la siguiente frontera de decisión.
 
 ```{r}
 plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ acceleration, 
@@ -2204,6 +2220,10 @@ plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ acceleration,
                   origin = 1))
 ```
 
+Note que en este caso, la clase de los automoviles con mayor consumo de combustible es la menos favorecida, pues gran parte de automoviles en esta clase fue considerada como automoviles de bajo consumo. Sin embargo la frontera de decisión representa adecuadamente la forma en la que se distribuyen los autos de mayor consumo. Es importante resaltar también que esta frontera de decisión, a pesar de ser basada en un kernel polinomial de grado mayor a uno, parece como si fuera linel.
+
+Ahora grafiquemos las frontera de decisión para las variables `horsepower` y `weight`.
+
 ```{r}
 plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ weight, 
      slice = list(year = median(auto_fit$year), 
@@ -2213,6 +2233,9 @@ plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ weight,
                   origin = 1))
 ```
 
+Una vez más, la frontera separa de una manera adecuada las clases en esta situación. Sin embargo, note que la frontera de decisión parece lineal, así como en el caso anterior.
+
+Finalmente grafiquemos la frontera de decisión para la variable `horsepower` y `displacement`.
 
 ```{r}
 plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ displacement, 
@@ -2223,8 +2246,13 @@ plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ displacement,
                   origin = 1))
 ```
 
+Note que en este caso la separación es efectiva, sin embargo hay algunos datos que no permiten que el conjunto sea separable, lo que no da oportunidad al clasificador de diferenciar estos casos particulares. Aun así, el clasificador etiqueta de manera adecuada los datos de entrenamiento segun su tendencia en la mayoría de los casos. Como sucedió en los demás casos, esta frontera no tiene una diferencia marcada en comparación a una frontera producida por un kernel lineal.
 
 ### SVM con kernel radial 
+
+En este caso, graficaremos las variables anteriormente mencionadas sobre un clasificador con kernel radial y observaremos el desempeño del calsificador en algunas de las situaciones.
+
+Inicialmente veamos la gráfica para las variables `horsepower` y `acceleration`.
 
 ```{r}
 plot(tune_svm_radial$best.model, auto_fit, horsepower ~ acceleration, 
@@ -2235,6 +2263,9 @@ plot(tune_svm_radial$best.model, auto_fit, horsepower ~ acceleration,
                   origin = 1))
 ```
 
+Note que para esta sección, se muestra claramente una frontera no lineal, sin embargo, a este punto no hay una separación notablemente efectiva. Esto pudo ocurrir probablemente al tomar una sección que no es adecuada para las demas variables. En esta gráfica, muchos de los autos con bajo consumo son clasificados como autos de alto consumo, pero esto puede corregirse si se toma una tajada más adecuada.
+
+Con la siguiente gráfica vamos a visualizar las variables `horsepower` y `weight`.
 
 ```{r}
 plot(tune_svm_radial$best.model, auto_fit, horsepower ~ weight, 
@@ -2245,6 +2276,9 @@ plot(tune_svm_radial$best.model, auto_fit, horsepower ~ weight,
                   origin = 1))
 ```
 
+Note que en este caso se nota tambien un el uso de un kernel no lineal por la forma de la frontera de decisión a diferencia del kernel polinomial. Se nota entonces que la separación le da mucha prioridad a los casos positivos, es decir, en esta tajada, la frontera trata de abarcar todos los carros con alto consumo, pues probablemente en esta sección haya una gran cantidad de datos ubicados en esta tajada que estan clasificados como 1.
+
+Finalmente, grafiquemos la frontera de decisión para las variables `horsepower` y `displacement`.
 
 ```{r}
 plot(tune_svm_radial$best.model, auto_fit, horsepower ~ displacement, 
@@ -2255,7 +2289,13 @@ plot(tune_svm_radial$best.model, auto_fit, horsepower ~ displacement,
                   origin = 1))
 ```
 
+En este caso ocurre lo mismo que el anterior caso, la frontera de decisión trata de abarcar la mayor cantidad de automoviles de alto consumo. Cabe aclarar que en estos casos no quiere decir que la calidad de la clasificación sea mala, por el contrario, puede suceder que en esta tajada hayan muchos casos en los cuales los automoviles tengan alto consumo y la frontera de decisión tiene que ampliarse para acaparar a la mayor cantidad de casos posibles.
+
 ### Curvas ROC y AUC
+
+Con el fin de comparar los modelos de clasificación, vamos a graficar las curvas ROC y a calcular el AUC para cada uno de los modelos usando un conjunto de entrenamiento y otro de validación, y así observar qué modelo se desempeña mejor en este caso.
+
+Inicialmente realicemos una partición de los datos en un conjunto de entrenamiento y otro de validación.
 
 ```{r}
 split_ratio <- 0.75
@@ -2265,6 +2305,8 @@ train_ind <- sample(seq_len(nrow(auto_fit)), size = smp_size)
 auto_fit_train <- auto_fit[train_ind, ]
 auto_fit_test <- auto_fit[-train_ind, ]
 ```
+
+Entrenemos un clasificador de soporte vectorial con los parámetros optimos obtenidos en literales anteriores y tabulemos los resultados.
 
 ```{r}
 svm_linear <- svm(mpg01 ~ ., 
@@ -2280,7 +2322,11 @@ roc_linear <- data.frame(
   truth = auto_fit_test$mpg01,
   prob = attr(svm_linear_test,"probabilities")[, "1"],
   Modelo = "Lineal")
+
+head(roc_linear)
 ```
+
+Ahora, entrenemos una máquina de soporte vectorial con kernel polinomial, usando el valor del grado óptimo encontrado en los literales anteriores.
 
 ```{r}
 svm_poly <- svm(mpg01 ~ ., 
@@ -2297,7 +2343,11 @@ roc_poly <- data.frame(
   truth = auto_fit_test$mpg01,
   prob = attr(svm_poly_test,"probabilities")[, "1"], 
   Modelo = "Polinomial")
+
+head(roc_poly)
 ```
+
+Finalmente entrenemos una máquina de soporte vectorial con kernel radial usando el valor de $\gamma$ encontrado en los literales anteriores. 
 
 ```{r}
 svm_radial <- svm(mpg01 ~ ., 
@@ -2314,7 +2364,11 @@ roc_radial <- data.frame(
   truth = auto_fit_test$mpg01,
   prob = attr(svm_radial_test,"probabilities")[, "1"],
   Modelo = "Radial")
+
+head(roc_radial)
 ```
+
+Teniendo la información recolectada anteriormente, grafiquemos las curvas ROC para cada uno de los modelos usados en este caso.
 
 ```{r}
 roc_merge <- rbind(roc_linear, roc_poly, roc_radial)
@@ -2326,9 +2380,14 @@ roc_merge %>%
   labs(title = "Curvas ROC")
 ```
 
+Notemos entonces que a partir de las curvas ROC no se puede afirmar que hay un modelo predominante. Se puede notar que los modelos entrenados tienen una buena calidad pues las curvas ROC estan alejadas de la recta dada por la función $f(x) = x$. 
+
+Con el objetivo de determinar una diferencia entre los modelos, veamos el AUC para cada uno de ellos.
+
 ```{r}
 roc_merge %>% 
   group_by(Modelo) %>% 
   roc_auc(truth, prob)
 ```
 
+En este caso, el modelo lineal tiene un mejor desempeño, pues el área bajo la curva ROC (AUC) para dicho modelo es mayor a los demas modelos. Sin embargo es importante resaltar que los modelos no tienen una diferencia muy marcada entre ellos pues el valor del AUC no varía demasiado, aun así, el modelo con kernel lineal posee mayor sinplicidad y obtiene un mayor AUC, por tanto es la mejor opción para realizar predicciones sobre este conjunto de datos.
