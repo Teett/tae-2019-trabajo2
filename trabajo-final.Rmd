@@ -46,7 +46,7 @@ library(randomForest) # Libreria para bosques aleatorios
 library(gbm) # Boosting
 library(pls) # Principal component regression
 library(ggforce) # Características adicionales para ggplot
-library(e1071) # Maquinas de soporte vectorial
+library(e1071) # máquinas de soporte vectorial
 library(caret) # Some models and plots
 ```
 
@@ -315,13 +315,13 @@ En este apartado, desarrollaremos un modelo para predecir cuando un carro tiene 
 Inicialmente observemos las características de este conjunto de datos. El conjunto de datos `Auto` contiene información sobre 392 vehículos cuyas variables son:
 
 - `mpg`: millas por galón.
-- `cylinders`: numero de cilindros (entre 4 y 8)
+- `cylinders`: número de cilindros (entre 4 y 8)
 - `displacement`: desplazamiento del motor en pies.
 - `horsepower`: caballos de fuerza del motor.
 - `weight`: peso del vehículo en libras.
 - `acceleration`: tiempo que tarda en acelerar de 0 a 60 medido en segundos.
 - `year`: modelo del auto (módulo 100)
-- `origin`: origen del vehiculo.
+- `origin`: origen del vehículo.
 - `name`: nombre del vehículo.
 
 Se mostrarán los primeros 6 datos junto con su encabezado.
@@ -333,7 +333,7 @@ head(auto)
 
 ## a) Creación de una variable respuesta binaria
 
-A continuación crearemos la variabel `mpg01` que tomará el valor de 1 si la variable `mpg` esta por encima de la mediana, y 0 en caso contrario.
+A continuación crearemos la variable `mpg01` que tomará el valor de 1 si la variable `mpg` está por encima de la mediana, y 0 en caso contrario.
 
 ```{r}
 median_mpg <- median(auto$mpg)
@@ -372,7 +372,7 @@ ggpairs(data = auto, columns = c(7, 9), mapping = aes(color = mpg01), legend = 1
 ```
 
 
-Tomando en cuenta las gráficas, podemos afirmar que las variables `cylinders`, `displacement`, `horsepower` y `weight` son buenas variables cuantitativas para realizar una clasificación de la variable `mpg01`, pues al graficar discriminando por clases se puede observar que hay una particion notoria entre los carros de alto consumo y bajo consumo respecto a estas 4 variables. Note también que la variabele origen puede ser una buena variable predictora para `mpg01` cuando el tipo de carro es americano.
+Tomando en cuenta las gráficas, podemos afirmar que las variables `cylinders`, `displacement`, `horsepower` y `weight` son buenas variables cuantitativas para realizar una clasificación de la variable `mpg01`, pues al graficar discriminando por clases se puede observar que hay una partición notoria entre los carros de alto consumo y bajo consumo respecto a estas 4 variables. Note también que la variabele origen puede ser una buena variable predictora para `mpg01` cuando el tipo de carro es americano.
 
 ## c) División de conjuntos de entrenamiento y validación
 
@@ -385,11 +385,14 @@ train_ind <- sample(seq_len(nrow(auto)), size = smp_size)
 
 auto_train <- auto[train_ind, ]
 auto_test <- auto[-train_ind, ]
+
+dim(auto_train)
+dim(auto_test)
 ```
 
 ## d) Modelo LDA
 
-A continuación realizaremos un modelo LDA considerando las varables que fueron extraidas en el análisis descriptivo y que se consideraron importantes a la hora de realizar una clasificación para la variable respuesta `mpg01`.
+A continuación realizaremos un modelo LDA considerando las varables que fueron extraídas en el análisis descriptivo y que se consideraron importantes a la hora de realizar una clasificación para la variable respuesta `mpg01`.
 
 ```{r}
 lda_model = lda(mpg01 ~ cylinders + displacement + horsepower + weight + origin, data = auto_train)
@@ -418,7 +421,7 @@ test_results_lda <- mpg_lda_class %>%
 test_results_lda
 ```
 
-Note entonces que la tasa de clasificación correcta es de un `r round(test_results_lda$.estimate[1] * 100, 2)`%, lo que muestra que el modelo tiene una alta calidad.
+Note entonces que la tasa de clasificación correcta es de un `r round(test_results_lda$.estimate[1] * 100, 2)`%, lo que muestra que el modelo tiene una buena calidad.
 
 ## e) Modelo QDA
 
@@ -445,7 +448,7 @@ test_results_qda <- mpg_qda_class %>%
 test_results_qda
 ```
 
-Note entonces que la tasa de clasificación correcta es de un `r round(test_results_qda$.estimate[1] * 100, 2)`%, y en comparación con el modelo LDA, se puede decir que tienen un desempeño muy parecido de acuerdo a la metrica de la tasa de clasificación correcta.
+Note entonces que la tasa de clasificación correcta es de un `r round(test_results_qda$.estimate[1] * 100, 2)`%, y en comparación con el modelo LDA. Se puede decir que tienen un desempeño muy parecido de acuerdo a  la tasa de clasificación correcta.
 
 ## f) Modelo de regresión logística
 
@@ -480,7 +483,7 @@ De acuerdo a este resultado, se puede ver que todos los métodos tienen un punta
 
 ## g) Modelo $KNN$
 
-Realicemos a continuación un modelo de $KNN$ para predecir la variable `mpg`, en este caso, debemos probar con varios casos de $K$ hallar un óptimo. Para esto, realizaremos una función que reciba como parámetro un numero $k$ y esta función retornará la tasa de clasificación correcta para el $k$ dado, realizando la clasificación sobre el conjunto de prueba.
+Realicemos a continuación un modelo de $KNN$ para predecir la variable `mpg`, en este caso, debemos probar con varios casos de $K$ para hallar un parámetro óptimo. Para esto, realizaremos una función que reciba como parámetro un numero $k$ y esta función retornará la tasa de clasificación correcta para el $K$ dado, realizando la clasificación sobre el conjunto de prueba.
 
 ```{r}
 get_accuracy_knn <- function(k) {
@@ -498,7 +501,7 @@ get_accuracy_knn <- function(k) {
 }
 ```
 
-Ahora tomaremos varios valores de $k$ en un rango entre 1 y 60, y para estos valores, computaremos su tasa de clasificación correcta y los graficaremos para observar cual es el mejor valor de $k$ en este rango.
+Ahora tomaremos varios valores de $K$ en un rango entre 1 y 60, y para estos valores, computaremos su tasa de clasificación correcta y los graficaremos para observar cual es el mejor valor de $k$ en este rango.
 
 ```{r}
 k_values = 1:60
@@ -539,7 +542,7 @@ mpg_knn_class %>% conf_mat(truth = real, estimate = pred) %>%
 best_accuracy_knn = round(test_results_knn$.estimate[1] * 100, 2)
 ```
 
-Concluimos entonces que para los valores de $k$ probados, el mejor accuracy obtenido fue de `r best_accuracy_knn`%, el cual sigue siendo muy similar a los puntajes anteriores y desde un punto de vista global, estos puntajes denotan que los modelos tienen una muy buena calidad.
+Concluimos entonces que para los valores de $k$ probados, la mejor tasa de clasificación correcta fue de `r best_accuracy_knn`%, la cuál sigue siendo muy similar a los puntajes anteriores y desde un punto de vista global, estos puntajes denotan que los modelos tienen una muy buena calidad.
 
 # Sección 4.7 -  Ejercicio 12
 
@@ -584,7 +587,7 @@ Power2(131, 3)
 
 ## d) Implementación de la función `Power3()`
 
-Ahora implementaremos una versión mucho más general para realizar las potencias que esta basada en la función `Power2()` pero en este caso, la función no imprimirá el resultado sino que retornara dicho valor como un objeto de `R`
+Ahora implementaremos una versión mucho más general para realizar las potencias que esta basada en la función `Power2()`, pero en este caso la función no imprimirá el resultado sino que retornara dicho valor como un objeto de `R`
 
 ```{r}
 Power3 <- function(x, a) {
@@ -595,7 +598,7 @@ Power3 <- function(x, a) {
 
 ## e) Usando `Plot3()` para graficar la función $f(x) = x ^ 2$
 
-En este bloque de código, graficaremos $f(x) = x ^ 2$ usando una escala logaritmica para el eje $y$
+En este bloque de código, graficaremos $f(x) = x ^ 2$ usando una escala logarítmica para el eje $y$
 
 ```{r}
 ggplot(data = tibble(x = 1:10, y = sapply(1:10, Power3, 2))) +
@@ -810,7 +813,7 @@ boston <- as_tibble(Boston) %>% mutate(
 head(boston)
 ```
 
-Ahora graficaremos el error de prueba con los siguientes valores de `mtry` y `ntree`. Para calcular el error de prueba en cada uno de los valores, crearemos una función que evalua el error de prueba en cada caso.
+Ahora graficaremos el error de prueba con una variedad de valores para `mtry` y `ntree`. Para calcular el error de prueba en cada uno de los valores, crearemos una función que evalua el error de prueba en cada caso.
 
 ```{r}
 mtry_values = 2:(ncol(boston) - 1)
@@ -843,7 +846,7 @@ dim(boston_train)
 dim(boston_test)
 ```
 
-Creamos un dataframe para los valores a probar
+Creamos un tabla para los valores a probar.
 
 ```{r}
 test_values <- expand.grid(mtry_values, ntree_values)
@@ -854,7 +857,7 @@ test_values["error"] <- apply(test_values, 1, test_error_random_forest, boston_t
 head(test_values)
 ```
 
-Y finalmente graficamos los errores mediante una grafica de niveles como se muestra a continuación.
+Y finalmente graficamos los errores mediante una gráfica de contornos como se muestra a continuación.
 
 ```{r}
 fig <- plot_ly(data = test_values, x=~mtry_values,y=~ntree_values, z=~error, type = "contour", colorscale='Jet') %>% 
@@ -864,23 +867,23 @@ fig <- plot_ly(data = test_values, x=~mtry_values,y=~ntree_values, z=~error, typ
 fig %>% colorbar(title = "MSE")
 ```
 
-Observemos que para esta seleccion de conjuntos de entrenamiento y de validación, se cumple que el *bagging* no es el metodo mas efectivo, pues allí la grafica se muestra mas oscura, y por tanto evidencia un valor mas alto del MSE. Para este caso, el valor de `mtree` más adecuado se encuentra entre 4 y 5. Note que los valores de `ntree` no tienen una relacion alguna con el $MSE$, pues  los mejores valores del error de validación se pueden envontrar con valores de `ntree`cercanos a 100 pero tambien con valores cercanos a 50. Sin embargo, valores bajos del `ntree` dan errores muy altos sin importar el valor de `mtree`.
+Observemos que para esta selección de conjuntos de entrenamiento y de validación, se cumple que el *bagging* no es el metodo mas efectivo, pues allí la grafica se muestra mas roja, y por tanto evidencia un valor mas alto del MSE. Para este caso, el valor de `mtree` más adecuado se encuentra entre 4 y 5. Note que los valores de `ntree` no tienen una relación significativa con el $MSE$, pues  los mejores valores del error de validación se pueden encontrar con valores de `ntree`cercanos a 100 pero también con valores cercanos a 50. Sin embargo, valores bajos del `ntree` dan errores muy altos sin importar el valor de `mtree`.
 
 # Sección 8.4 -  Ejercicio 8
 
-Analizaremos el conjunto de datos `Carseats`, el cuál es un conjunto de datos que posee información respecto a sillas para niño que se ubican dentro de los automoviles, y realizaremos una regresión para la variable `Sales`. Las variables que tiene este conjunto de datos son las siguientes:
+Analizaremos el conjunto de datos `Carseats`, el cuál es un conjunto de datos que posee información respecto a sillas para niños, las cuales que se ubican dentro de los automóviles, y realizaremos una regresión para la variable `Sales`. Las variables que tiene este conjunto de datos son las siguientes:
 
 - `Sales`: unidades vendidas en miles en cada una de las ubicaciones.
 - `CompPrice`: precio por competidor en cada ubicación.
 - `Income`: ingresos de la comunidad en miles de dólares.
 - `Advertising`: presupuesto para propaganda local en cada ubicación.
-- `Population`: poblacion en cada región.
+- `Population`: población en cada región.
 - `Price`: precio de los asientos en cada sitio.
 - `ShelveLoc`: calidad de los puntos de venta en cada ubicación.
 - `Age`: edad promedio de la población en cada ubicación.
 - `Education`: nivel de educación en cada ubicación.
 - `Urban`: determina si la tienda se encuentra en territorio rural o urbano.
-- `US`: determina is la tienda esta en EE.UU.
+- `US`: determina si la tienda esta en EE.UU.
 
 ```{r}
 carseats <- as_tibble(Carseats)
@@ -890,7 +893,7 @@ head(carseats)
 
 ## a) División del conjunto de datos en entrenamiento y validación 
 
-A continuación dividiremos el conjunto de datos en un conjunto de validación y otro de prueba, obteniendo las siguientes dimensiones respectivamente.
+A continuación dividiremos el conjunto de datos en un conjunto de entrenamiento y otro de prueba, obteniendo las siguientes dimensiones respectivamente.
 
 ```{r}
 split_ratio <- 0.75
@@ -928,15 +931,15 @@ mse_test <- mean((test_predict - carseats_test$Sales) ^ 2)
 mse_test
 ```
 
-Y tambien mostremos el $RMSE$ para este modelo tomando el conjunto de entrenamiento.
+Y también mostremos el $RMSE$ para este modelo tomando el conjunto de entrenamiento.
 
 ```{r}
 sqrt(mse_test)
 ```
 
-Como conclusión se puede observar que una variable que determina el numero de venta de manera diferenciadora es la variable `ShelveLoc`, note entonces que cuando un local tiene buena calidad en las estanterías del punto de venta, la cantidad de ventas es mucho mayor respecto a locales con una calidad mas baja. Aún así, los productos con un precio más bajo tiende a tener una cantidad de unidades vendidas mucho mas alta. Por tanto, dos aspectos que favorecen a las ventas es tener un local con buena calidad y precios por debajo de 97.5 dólares. Finalemente, considerando que la raiz del error cuadrático medio es aproximadamente de `r sqrt(mse_test)`, quiere decir que el modelo se equivoca en un radio de `r sqrt(mse_test)`, lo que realmente da una predicción aceptable sobre los asientos vendidos.
+Como conclusión se puede observar que una variable que determina el número de ventas de manera diferenciadora es la variable `ShelveLoc`, note entonces que cuando un local tiene buena calidad en las estanterías del punto de venta, la cantidad de ventas es mucho mayor respecto a locales con una calidad más baja. Aún así, los productos con un precio más bajo tienden a tener una cantidad de unidades vendidas mucho más alta. Por tanto, dos aspectos que favorecen a las ventas es tener un local con buena calidad y precios por debajo de 97.5 dólares. Finalemente, considerando que la raíz del error cuadrático medio es aproximadamente de `r sqrt(mse_test)`, quiere decir que el modelo se equivoca en un radio de `r sqrt(mse_test)`, lo que realmente da una predicción aceptable sobre los asientos vendidos.
 
-## c) Uso de validacion cruzada para determinar el nivel de complejidad óptimo
+## c) Uso de validación cruzada para determinar el nivel de complejidad óptimo
 
 En esta sección podaremos el árbol entrenado usando validación cruzada, con el objetivo de mejorar la calidad de la recomendación.
 
@@ -959,7 +962,7 @@ Note entonces que la validación cruzada arroja que el mejor árbol es el árbol
 
 ## d) Bagging e importancia de las variables
 
-Ahora, usaremos *bagging* con el objetivo de observar si hay una mejora en la predicción y tambien se requiere observar cuáles son las variables mas importantes en este modelo.
+Ahora, usaremos *bagging* con el objetivo de observar si hay una mejora en la predicción y también se requiere observar cuáles son las variables mas importantes en este modelo.
 
 Incialmente realizaremos *bagging* y compararemos el $RMSE$ con los métodos previos.
 
@@ -1196,7 +1199,7 @@ head(hitters)
 
 ## a) Remoción de NA's y escalamiento logaritmico
 
-Inicialmente se eliminaran aquellas filas donde el salario tenga el valor `NA`. Para ello primero observemos si la columna `Salary` es la única que tiene `NA`.
+Inicialmente se eliminarán aquellas filas donde el salario tenga el valor `NA`. Para ello primero observemos si la columna `Salary` es la única que tiene `NA`.
 
 ```{r}
 summary(hitters)
@@ -1296,11 +1299,11 @@ ggplot(data = lambda_test_mse_values_df) +
 
 Note entonces que el mejor valor para $\lambda$ es `r best_lambda_test_boosting`, del cual se obtiene un valor para el $MSE$ de validación de `r best_mse_test_boosting`.
 
-Como conclusión respecto a los valore encontrados en la gráfica del literal anterior, se puede observar entonces que al aumentar el $\lambda$, el $MSE$ de entrenamiento desciende ya que el algoritmo de optimización pretende minimizar el $MSE$ de los datos con el cual se entrena el modelo. Pero algo muy interesante que hay que notar, es que contrario a lo que pasa en el conjunto de entrenamiento, el $MSE$ de validación aumenta a medida que aumentamos $\lambda$, lo que sugiere que hay un sobreajuste del modelo para valores de $\lambda$ cercanos a 1 o mayores. Esto muestra que juzgar un modelo mediante un conjunto de entrenamiento no es adecuado, pues pueden haber parámetros que no esten generalizando bien el comportamiento real de los datos.
+Como conclusión respecto a los valore encontrados en la gráfica del literal anterior, se puede observar entonces que al aumentar el $\lambda$, el $MSE$ de entrenamiento desciende ya que el algoritmo de optimización pretende minimizar el $MSE$ de los datos con el cuál se entrena el modelo. Pero algo muy interesante que hay que notar, es que contrario a lo que pasa en el conjunto de entrenamiento, el $MSE$ de validación aumenta a medida que aumentamos $\lambda$, lo que sugiere que hay un sobreajuste del modelo para valores de $\lambda$ cercanos a 1 o mayores. Esto muestra que juzgar un modelo mediante un conjunto de entrenamiento no es adecuado, pues pueden haber parámetros que no esten generalizando bien el comportamiento real de los datos.
 
 ## e) Comparación de *boosting* con métodos previos
 
-En esta sección compararemos el $MSE$ de boosting respecto a otros métodos vistos ateriormente como regresión lineal múltiple y regresión de componentes principales.
+En esta sección compararemos el $MSE$ de *boosting* respecto a otros métodos vistos ateriormente como regresión lineal múltiple y regresión de componentes principales.
 
 Primero calculemos el $MSE$ para el metodo de regresión lineal múltiple
 
@@ -1318,7 +1321,7 @@ pcr_hitters <- pcr(Salary ~ ., data = hitters_train, scale = TRUE, validation = 
 summary(pcr_hitters)
 ```
 
-En este caso, encontramos que el menor valor optimo se logró con $M = 17$ por tanto calcularemos el error de validación con dicho número de componentes, obteniendo así el siguiente $MSE$
+En este caso, encontramos que el valor óptimo se logró con $M = 17$ por tanto calcularemos el error de validación con dicho número de componentes, obteniendo así el siguiente $MSE$.
 
 ```{r}
 pcr_hitters_pred <- predict(pcr_hitters, hitters_test, ncomp = 17)
@@ -1326,11 +1329,11 @@ error_pcr <- mean((pcr_hitters_pred - hitters_test$Salary))
 error_pcr
 ```
 
-Finalmente, concluimos que en este caso el boosting no era la mejor opción, pues encontramos que el $MSE$ para la regresión lineal multiple era mucho menor, y de hecho es el menor de los tres $MSE$ de prueba calculados.
+Finalmente, concluimos que en este caso el *boosting* no era la mejor opción, pues encontramos que el $MSE$ para la regresión lineal multiple era mucho menor, y de hecho es el menor de los tres $MSE$ de prueba calculados.
 
 ## f) Importancia de las variables
 
-Ahora observaremos cual es la improtancia de las variables respecto a este método. Para ello entrenemos el modelo con el mejor lambda obtenido y analicemos la tabla de importancias.
+Ahora observaremos cual es la improtancia de las variables respecto a este método. Para ello entrenemos el modelo con el mejor $\lambda$ obtenido y analicemos la tabla de importancias.
 
 ```{r}
 gbm_hitters <- gbm(Salary ~ ., data = hitters_train, distribution = "gaussian", n.trees = 1000, shrinkage = best_mse_test_boosting)
@@ -1599,9 +1602,9 @@ En este caso, incrementar el umbral a 90% no mejora los falsos negativos, por lo
 
 # Sección 9.7 - Ejercicio 4
 
-El objetivo de este ejercicio es verificar la efectividad del metodo *SVM* para clasificar un conjunto de datos donde no hay una separación lineal entre ellos. Observaremos entonces una comparacion entre un clasificador de soporte vectorial y una maquina de soporte vectorial con kernel polinomial o con un kernel radial.
+El objetivo de este ejercicio es verificar la efectividad del metodo *SVM* para clasificar un conjunto de datos donde no hay una separación lineal entre ellos. Observaremos entonces una comparación entre un clasificador de soporte vectorial y una máquina de soporte vectorial con kernel polinomial o con un kernel radial.
 
-Primero crearemos el conjunto de datos sintéticos con una separacion no lineal.
+Primero crearemos el conjunto de datos sintéticos con una separación no lineal.
 
 ```{r}
 x1_values <- runif(100, min = 0, max = 1)
@@ -1645,14 +1648,14 @@ dim(syntetic_train)
 dim(syntetic_test)
 ```
 
-Primero entrenemos un SVC (Support Vector Classifier) y extraigamos su error en el conjunto de entrenamiento. Es importante notar que tomaremos el costo para la frontera de clasificación como 10 y observaremos el de este costo sobre los demás modelos.
+Primero entrenemos un SVC (Support Vector Classifier) y vamos a extraer su error en el conjunto de entrenamiento. Es importante notar que tomaremos el costo para la frontera de clasificación como 10 y observaremos el de este costo sobre los demás modelos.
 
 ```{r}
 linear_svm_syntethic <- svm(Class ~ ., data = syntetic_train, kernel = "linear", cost = 10, scale = FALSE)
 summary(linear_svm_syntethic)
 ```
 
-Grafiquemos la clasificación y observemos los resultados.
+Grafiquemos la frontera de decisión y observemos los resultados.
 
 ```{r}
 plot(linear_svm_syntethic, syntetic_train)
@@ -1673,7 +1676,7 @@ predict_svm_syntetic_test <- predict(linear_svm_syntethic, syntetic_test)
 linear_svm_test_error <- mean(predict_svm_syntetic_test == syntetic_test$Class)
 ```
 
-Se puede notar entonces que para el conjunto de datos de validación, se tiene una tasa de clasificación correcta del `r linear_svm_test_error * 100`%. Note que en este caso la grafica es aproximada a la de entrenamiento, pues este clasificador es muy similar a tomar cualquier pareja $X_1$ y $X_2$ y asignarles de manera aleatoria uniforme la etiqueta 1 o 0.
+Se puede notar entonces que para el conjunto de datos de validación, se tiene una tasa de clasificación correcta del `r linear_svm_test_error * 100`%. Note que en este caso la grafica es aproximada a la de entrenamiento, y además este clasificador es muy similar a tomar cualquier pareja $X_1$ y $X_2$ y asignarles de manera aleatoria uniforme la etiqueta 1 o 0.
 
 Esto se puede ver un poco mas claro observando la matriz de confusión para este modelo.
 
@@ -1700,7 +1703,7 @@ Realicemos una gráfica para este clasificador sobre el conjunto de entrenamient
 plot(radial_svm_syntethic, syntetic_train)
 ```
 
-Es importante apreciar que el clasificador radial hace una clasificación casi perfecta, o al menos así se aprecia graficamente, además toma un conjunto mucho mas razonable de vectores de soporte, que son los que están más cercanos a la frontera de clasificación, al contrario del metodo lineal, el cual tomaba vectores de soporte que no corresponden a la intuición del modelo.
+Es importante apreciar que el clasificador radial hace una clasificación casi perfecta, o al menos así se muestra gráficamente, además toma un conjunto mucho mas razonable de vectores de soporte, que son los que están más cercanos a la frontera de clasificación, al contrario del metodo lineal, el cual tomaba vectores de soporte que no corresponden a la intuición del modelo.
 
 Ahora, para verificar el argumento que se mostró en el parrafo anterior, verifiquemos el error de entrenamiento de este modelo.
 
@@ -1710,11 +1713,12 @@ radial_svm_train_error <- mean(radial_svm_syntethic$fitted == syntetic_train$Cla
 
 Note entonces que la tasa de clasificación correcta para el conjunto de entrenamiento tomando un kernel radial es de `r radial_svm_train_error * 100`%, lo cual muestra una efectividad superior al clasificador de soporte vectorial (usando kernel lineal)
 
-De igual manera, observemos la tasa de clasificación correcta para este modelo con kernel radial.
+De igual manera, observemos la tasa de clasificación correcta para este modelo con kernel radial para el conjunto de validación.
 
 ```{r}
 predict_svm_syntetic_test_radial <- predict(radial_svm_syntethic, syntetic_test)
 radial_svm_test_error <- mean(predict_svm_syntetic_test_radial == syntetic_test$Class)
+radial_svm_test_error
 ```
 
 Observemos como es la matriz de confusión para este modelo con kernel radial.
@@ -1729,11 +1733,11 @@ svm_syntetic_test_radial_class %>% conf_mat(truth = real, estimate = pred) %>%
 ```
 
 
-Note entonces que en este caso, la tasa de clasificación correcta es de `r radial_svm_test_error * 100`%, lo que muestra que el kernel radial es superior al kernel lineal cuando no hay una separación lineal entre las clases, como era de esperarse. Sin embargo el cambio entre ambos modelos es muy significativo, pues se pasa de tener un modelo cuya selección en la practica corresponde a un clasificador aleatorio uniforme, a tener un modelo con un desempeño casi perfecto.
+Note entonces que en este caso, la tasa de clasificación correcta es de `r radial_svm_test_error * 100`%, lo que muestra que el kernel radial es superior al kernel lineal cuando no hay una separación lineal entre las clases, como era de esperarse. Sin embargo, el cambio entre ambos modelos es muy significativo, pues se pasa de tener un modelo cuya selección en la práctica corresponde a un clasificador aleatorio uniforme, a tener un modelo con un desempeño casi perfecto.
 
 # Sección 9.7 - Ejercicio 5
 
-En esta sección se observará que mediante la aplicación de regresión logística, tambien se puede obtener una frontera de decisión no lineal como se logra con las máquinas de soporte vectorial.
+En esta sección se observará que mediante la aplicación de regresión logística, también se puede obtener una frontera de decisión no lineal como se logra con las máquinas de soporte vectorial.
 
 ## a) Construcción de los datos sintéticos
 
@@ -1850,9 +1854,9 @@ Note entonces que el ROC y el AUC son evidencia de que el modelo no tiene muy bu
 
 ## e) Entrenamiento de un modelo con transformaciones no lineales
 
-Ahora entrenaremos un modelo aplicando transformaciones no lineales sobre las caracteristicas. En este caso aplicaremos las transformaciones $X_1^2$ y $X_2^2$.
+Ahora entrenaremos un modelo aplicando transformaciones no lineales sobre las características. En este caso aplicaremos las transformaciones $X_1^2$ y $X_2^2$.
 
-```{r}
+```{r warning=F}
 nonlinear_glm_syntetic_quadratic <- glm(y ~ I(x1 ^ 2) + I(x2 ^ 2), data = syntetic_quadratic_train, family = "binomial")
 summary(nonlinear_glm_syntetic_quadratic)
 ```
@@ -1879,7 +1883,7 @@ nonlinear_glm_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pre
   labs(title = "Matriz de confusión para el modelo logístico (con transformaciones no lineales)")
 ```
 
-Observemos que la calidad de este modelo tiene un desempeño muy bueno, pues los residuales tienen una media de cero y por otro lado el AIC es menor, en comparación con los residuales de la regresión logística sin transformaciones cuadráticas. Esto demuestra entonces que cuando se tienen separaciones no lineales, se puede alcanzar una calidad muy buena en las predicciones sin recurrir a modelos sofisticados, y tomando en cuenta además que la regresión logística brinda mucha información adicional como por ejemplo, la importancia de las variables, el AIC y otros medidores que ayudan a comprender mas a fondo el problema.
+Observemos que la calidad de este modelo tiene un desempeño muy bueno, pues los residuales tienen una media de cero y por otro lado el AIC es menor, en comparación con los residuales de la regresión logística sin transformaciones cuadráticas. Esto demuestra entonces que cuando se tienen separaciones no lineales, se puede alcanzar una calidad muy buena en las predicciones sin recurrir a modelos sofisticados, y tomando en cuenta además que la regresión logística brinda mucha información adicional como por ejemplo, la importancia de las variables, el AIC y otros medidores que ayudan a comprender más a fondo el problema.
 
 Miremos la curva roc para este modelo.
 
@@ -1921,14 +1925,14 @@ ggplot(data = data.frame(x1 = syntetic_quadratic_train$x1,
 
 ## g) Entrenamiento de un clasificador de soporte vectorial
 
-Con el objetivo de realizar comparaciones con los metodos lineales generalizados presentados anteriormente, se entrenará un clasificador de soporte vectoríal sobre los datos sinteticos con separación no lineal, como se muestra a continuación.
+Con el objetivo de realizar comparaciones con los métodos lineales generalizados presentados anteriormente, se entrenará un clasificador de soporte vectoríal sobre los datos sintéticos con separación no lineal, como se muestra a continuación.
 
 ```{r}
 svm_linear_syntetic_quadratic <- svm(y ~ ., data = syntetic_quadratic_train, kernel = "linear", cost = 10, scale = FALSE, probability = TRUE)
 summary(svm_linear_syntetic_quadratic)
 ```
 
-Ahora realicemos una grafica que muestre las fronteras de decisión para este modelo.
+Ahora realicemos una gráfica que muestre las fronteras de decisión para este modelo.
 
 ```{r}
 plot(svm_linear_syntetic_quadratic, syntetic_quadratic_train)
@@ -2000,7 +2004,7 @@ error_nonlinear_svm_syntetic_quadratic <- mean(predict_svm_nonlinear_syntetic_qu
 error_nonlinear_svm_syntetic_quadratic
 ```
 
-Ahora si observamos la matriz de confusión de este modelo, se vera confirmada la calidad del modelo que se observó en la grafica anterior
+Ahora si observamos la matriz de confusión de este modelo, se vera confirmada la calidad del modelo que se observó en la gráfica anterior
 
 ```{r}
 svm_nonlinear_syntetic_quadratic_class <- tibble(
@@ -2012,7 +2016,7 @@ svm_nonlinear_syntetic_quadratic_class %>% conf_mat(truth = real, estimate = pre
   labs(title = "Matriz de confusión para la máquina de soporte vectorial con kernel no lineal")
 ```
 
-Note entonces que la calidad de la predicción aumentó en gran medida, y no solo eso, además el modelo toma vectores de soporte mucho mas razonables que en el clasificador de soporte vectorial. Note además que la tasa de clasificación correcta es `r error_nonlinear_svm_syntetic_quadratic * 100`%, la cual es una tasa de clasificación correcta extremadamente buena, obteniendo que el modelo representa correctamente el comportamiento de los datos.
+Note entonces que la calidad de la predicción aumentó en gran medida, y no solo eso, además el modelo toma vectores de soporte mucho mas razonables que en el clasificador de soporte vectorial. Note además que la tasa de clasificación correcta es `r error_nonlinear_svm_syntetic_quadratic * 100`%, la cuál es una tasa de clasificación correcta extremadamente buena, obteniendo que el modelo representa correctamente el comportamiento de los datos.
 
 Ahora para confirmar que la calidad del modelo es buena, grafiquemos la curva ROC.
 
@@ -2037,9 +2041,9 @@ Se puede concluir a partir del AUC, que por una poca diferencia, el modelo logí
 
 ## i) Comentarios y conclusiones
 
-Lo primero que se debe notar es que cuando los modelos no tienen una capacidad de representar una separación no lineal, como en el caso de la regresión logística tradicional y el clasificador de soporte vectorial, todo dependerá entonces del numero de elementos dentro de cada clase. En general, cuando el numero de elementos de cada clase es muy parejo y la distribución en el espacio es relativamente simétrica, el clasificador obtiene un comportamiento de un clasificador aleatorio.
+Lo primero que se debe notar es que cuando los modelos no tienen una capacidad de representar una separación no lineal, como en el caso de la regresión logística tradicional y el clasificador de soporte vectorial, todo dependerá entonces del numero de elementos dentro de cada clase y su ubicación en el espacio. En general, cuando el número de elementos de cada clase es muy parejo y la distribución en el espacio es relativamente simétrica pero no linealmente separable, el clasificador obtiene un comportamiento de un clasificador aleatorio.
 
-Por otro lado se observa que al dotar a un modelo de capacidad no lineal, este representa muy bien la frontera de decisión. Sin embargo es importante poner a juicio la pregunta: ¿en este caso es mejor un modelo logístico con transformaciones no lineales, o una maquina de soporte vectorial?, y en este caso se considera que es mas recomendable siempre abordar los problemas desde el modelo computacionalmente mas sencillo, el cuál es, el modelo logístico; además es importante resaltar que el modelo logístico brinda mucha mas información respecto a los predictores que la misma maquina de soporte vectorial, sin dejar de lado la simplicidad e interpretabilidad del modelo, pues es importante recordar que este modelo ofrece una interpretabilidad probabilistica, y da la posibilidad de abordar los resultados desde un punto de vista mucho mas estadístico en comparación con el SVM.
+Por otro lado se observa que al dotar a un modelo de capacidad no lineal, este representa muy bien la frontera de decisión. Sin embargo es importante poner a juicio la pregunta: ¿en este caso es mejor un modelo logístico con transformaciones no lineales, o una máquina de soporte vectorial?, y en este caso se considera que es mas recomendable siempre abordar los problemas desde el modelo computacionalmente más sencillo, el cuál es, el modelo logístico; además es importante resaltar que el modelo logístico brinda mucha más información respecto a los predictores que la máquina de soporte vectorial, sin dejar de lado la simplicidad e interpretabilidad del modelo, pues es importante recordar que este modelo ofrece una interpretabilidad probabilística, y da la posibilidad de abordar los resultados desde un punto de vista mucho mas estadístico en comparación con el SVM.
 
 # Sección 9.7 - Ejercicio 7
 
@@ -2075,7 +2079,7 @@ Al notar la imágen anterior, se puede observar que muchas de las variables tien
 
 ## b) Clasificador de soporte vectorial
 
-Construyamos un clasificador de soporte vectorial y observemos varios valores para la varible `cost` usando validación cruzada, para ello consideremos el siguiente codigo, y extraigamos el mejor clasificador con respecto a la variable `cost`.
+Construyamos un clasificador de soporte vectorial y observemos varios valores para la varible `cost` usando validación cruzada, para ello consideremos el siguiente codigo, y con el se extraerá el mejor clasificador con respecto a la variable `cost`.
 
 ```{r}
 set.seed(20)
@@ -2097,11 +2101,11 @@ ggplotly(g)
 
 Note pues que se pudo tomar cualquier costo entre 1.41 y 3.21 y se hubiera obtenido el mismo resultado.
 
-El desempeño del modelo tiene una buena calidad, pues reporta una tasa de clasificación correcta de `r tune_svc$best.performance * 100`%. Es posible que este resultado haya sido debido a que en la gráfica descriptiva, se noto una clara tendencia de múltiples variables al resaltarlas para cada una de las clases, y es posible que el modelo haya detectado y expresado de manera correcta dicha separación.
+El desempeño del modelo tiene una buena calidad, pues reporta una tasa de clasificación incorrecta de `r tune_svc$best.performance * 100`%. Es posible que este resultado haya sido debido a que en la gráfica descriptiva, se noto una clara separación de múltiples variables al resaltarlas para cada una de las clases, y es posible que el modelo haya detectado y expresado de manera correcta dicha separación.
 
 ## c) SVM con kernel no lineal
 
-Ahora encontremos un modelo óptimo para este conjunto de datos usando un modelo SVM con kernel no lineal. Primero, usaremos un modelo con un kernel polinomial y extraeremos el mejor modelo probando sobre varios grados del polinomio; posteriormente, probaremos con una maquina de soporte vectorial con kernel radial y encontraremos el mejor modelo para varios valores de $\gamma$. En ambos modelos, se buscará un valor adecuado para el costo.
+Ahora encontremos un modelo óptimo para este conjunto de datos usando un modelo SVM con kernel no lineal. Primero, usaremos un modelo con un kernel polinomial y extraeremos el mejor modelo probando sobre varios grados del polinomio; posteriormente, probaremos con una máquina de soporte vectorial con kernel radial y encontraremos el mejor modelo para varios valores de $\gamma$. En ambos modelos, se buscará un valor adecuado para el costo.
 
 ### SVM con kernel polinomial
 
@@ -2114,7 +2118,7 @@ tune_svm_polynomial <- tune(svm, mpg01 ~ ., data = auto_fit, kernel = "polynomia
                                degree = seq(from = 2, to = 10, by = 1)))
 ```
 
-Se obtiene que el mejor modelo tiene un grado `r tune_svm_polynomial$best.parameters$degree` y un costo de `r tune_svm_polynomial$best.parameters$cost`, para así obtener un tasa de error de clasificación de `r tune_svm_polynomial$best.performance * 100`%, el cual es levemente mejor que la maquina de soporte vectorial con kernel lineal.
+Se obtiene que el mejor modelo tiene un grado `r tune_svm_polynomial$best.parameters$degree` y un costo de `r tune_svm_polynomial$best.parameters$cost`, para así obtener un tasa de error de clasificación de `r tune_svm_polynomial$best.performance * 100`%, el cual es levemente mejor que la máquina de soporte vectorial con kernel lineal.
 
 Realicemos una gráfica para observar el comportamiento del error respecto al costo y al grado
 
@@ -2133,7 +2137,7 @@ Esta figura se puede observar que es una mala estrategia tomar valores para el g
 
 ### SVM con kernel radial
 
-Ahora, entrenemos una maquina de soporte vectorial con un kernel radial. Para ello encontraremos los mejores parámetros para el costo y para $\gamma$.
+Ahora, entrenemos una máquina de soporte vectorial con un kernel radial. Para ello encontraremos los mejores parámetros para el costo y para $\gamma$.
 
 ```{r}
 set.seed(20)
@@ -2160,13 +2164,13 @@ Esta gráfica demuestra que el modelo es altamente sensible al costo, al contrar
 
 ## d) Gráficas
 
-De acuerdo a la gráfica de correlaciones presentada al inicio de la sección, se puede observar que la interacción de los caballos de fuerza del automovil tienen una interacción notoría con las demás variables y a su vez muestra una tendencia marcada al diferenciar los datos para cada una de las clases de la variable `mpg01`. En vista de ello, centraremos nuestro análisis en tomar la variable `horsepower`y compararla con las variables que ofrecen mas información.
+De acuerdo a la gráfica de correlaciones presentada al inicio de la sección, se puede observar que la interacción de los caballos de fuerza del automóvil tienen una interacción notoria con las demás variables y a su vez muestra una tendencia marcada al diferenciar los datos para cada una de las clases de la variable `mpg01`. En vista de ello, centraremos nuestro análisis en tomar la variable `horsepower`y compararla con las variables que ofrecen más información.
 
-Para este análisis comprararemos la variable `horsepower` con otras tres variables, las cuales son `acceleration`, `displacement` y `weight`, observando allí como actua cada uno de los modelos. Es importante aclarar que en cada una de las graficas se tomo una tajada (o **slice**) justo en la mediana de cada una de las variables restantes.
+Para este análisis comprararemos la variable `horsepower` con otras tres variables, las cuáles son `acceleration`, `displacement` y `weight`, observando allí como actua cada uno de los modelos. Es importante aclarar que en cada una de las gráficas se tomo una tajada (o *slice*) justo en la mediana de cada una de las variables restantes.
 
 ### SVM con kernel lineal 
 
-Inicialmente si observemos las gráficas de las maquinas de soporte vectorial para cada pareja de variables. A continuación mostraremos la gráfica de la maquina de soporte vectorial para las variables `horsepower` y `acceleration`.
+Inicialmente si observemos las gráficas de las máquinas de soporte vectorial para cada pareja de variables. A continuación mostraremos la gráfica de la máquina de soporte vectorial para las variables `horsepower` y `acceleration`.
 
 ```{r}
 plot(tune_svc$best.model, auto_fit, horsepower ~ acceleration, 
@@ -2177,7 +2181,7 @@ plot(tune_svc$best.model, auto_fit, horsepower ~ acceleration,
                   origin = 1))
 ```
 
-En este caso, note que la maquina de soporte vectorial reconoce muy bien la separación mostrada en este par de variables, por tanto la maquina de soporte vectorial con kernel lineal se muestra efectiva en esta situación.
+En este caso, note que la máquina de soporte vectorial reconoce muy bien la separación mostrada en este par de variables, por tanto la máquina de soporte vectorial con kernel lineal se muestra efectiva en esta situación.
 
 Ahora grafiquemos las variables `horsepower` y `displacement` y observemos la frontera de decisión en este caso.
 
@@ -2190,7 +2194,7 @@ plot(tune_svc$best.model, auto_fit, horsepower ~ displacement,
                   origin = 1))
 ```
 
-Se encuentra entonces que hay ciertos carros cuyo consumo de combustible está por debajo de la mediana pero aún así aparecen clasificados como autos con alto consumo. Esto puede ocurrir debido al gran peso estadístico que ofrecen los datos para la clase de los automoviles de alto consumo.
+Se encuentra entonces que hay ciertos carros cuyo consumo de combustible está por debajo de la mediana pero aún así aparecen clasificados como autos con alto consumo. Esto puede ocurrir debido al gran peso estadístico que ofrecen los datos para la clase de los automóviles de alto consumo.
 
 Finalmente para este modelo, grafiquemos la frontera de decisión para las variables `horsepower` y `weight`.
 
@@ -2207,7 +2211,7 @@ Este caso es interesante, pues note que la separación lineal es razonablemente 
 
 ### SVM con kernel polinomial 
 
-En esta sección, consideraremos las mismas parejas que se mostraron en el análisis anterior para una maquina de soporte vectorial con un kernel polinomial de grado 3.
+En esta sección, consideraremos las mismas parejas que se mostraron en el análisis anterior para una máquina de soporte vectorial con un kernel polinomial de grado 3.
 
 Para las variables `horsepower` y `acceleration` se tiene la siguiente frontera de decisión.
 
@@ -2220,7 +2224,7 @@ plot(tune_svm_polynomial$best.model, auto_fit, horsepower ~ acceleration,
                   origin = 1))
 ```
 
-Note que en este caso, la clase de los automoviles con mayor consumo de combustible es la menos favorecida, pues gran parte de automoviles en esta clase fue considerada como automoviles de bajo consumo. Sin embargo la frontera de decisión representa adecuadamente la forma en la que se distribuyen los autos de mayor consumo. Es importante resaltar también que esta frontera de decisión, a pesar de ser basada en un kernel polinomial de grado mayor a uno, parece como si fuera linel.
+Note que en este caso, la clase de los automóviles con mayor consumo de combustible es la menos favorecida, pues gran parte de automóviles en esta clase fue considerada como automóviles de bajo consumo. Sin embargo la frontera de decisión representa adecuadamente la forma en la que se distribuyen los autos de mayor consumo. Es importante resaltar también que esta frontera de decisión, a pesar de ser basada en un kernel polinomial de grado mayor a uno, parece como si fuera linel.
 
 Ahora grafiquemos las frontera de decisión para las variables `horsepower` y `weight`.
 
@@ -2276,7 +2280,7 @@ plot(tune_svm_radial$best.model, auto_fit, horsepower ~ weight,
                   origin = 1))
 ```
 
-Note que en este caso se nota tambien un el uso de un kernel no lineal por la forma de la frontera de decisión a diferencia del kernel polinomial. Se nota entonces que la separación le da mucha prioridad a los casos positivos, es decir, en esta tajada, la frontera trata de abarcar todos los carros con alto consumo, pues probablemente en esta sección haya una gran cantidad de datos ubicados en esta tajada que estan clasificados como 1.
+Note que en este caso se nota también un el uso de un kernel no lineal por la forma de la frontera de decisión a diferencia del kernel polinomial. Se nota entonces que la separación le da mucha prioridad a los casos positivos, es decir, en esta tajada, la frontera trata de abarcar todos los carros con alto consumo, pues probablemente en esta sección haya una gran cantidad de datos ubicados en esta tajada que estan clasificados como 1.
 
 Finalmente, grafiquemos la frontera de decisión para las variables `horsepower` y `displacement`.
 
@@ -2289,7 +2293,7 @@ plot(tune_svm_radial$best.model, auto_fit, horsepower ~ displacement,
                   origin = 1))
 ```
 
-En este caso ocurre lo mismo que el anterior caso, la frontera de decisión trata de abarcar la mayor cantidad de automoviles de alto consumo. Cabe aclarar que en estos casos no quiere decir que la calidad de la clasificación sea mala, por el contrario, puede suceder que en esta tajada hayan muchos casos en los cuales los automoviles tengan alto consumo y la frontera de decisión tiene que ampliarse para acaparar a la mayor cantidad de casos posibles.
+En este caso ocurre lo mismo que el anterior caso, la frontera de decisión trata de abarcar la mayor cantidad de automóviles de alto consumo. Cabe aclarar que en estos casos no quiere decir que la calidad de la clasificación sea mala, por el contrario, puede suceder que en esta tajada hayan muchos casos en los cuales los automóviles tengan alto consumo y la frontera de decisión tiene que ampliarse para acaparar a la mayor cantidad de casos posibles.
 
 ### Curvas ROC y AUC
 
@@ -2306,7 +2310,7 @@ auto_fit_train <- auto_fit[train_ind, ]
 auto_fit_test <- auto_fit[-train_ind, ]
 ```
 
-Entrenemos un clasificador de soporte vectorial con los parámetros optimos obtenidos en literales anteriores y tabulemos los resultados.
+Entrenemos un clasificador de soporte vectorial con los parámetros óptimos obtenidos en literales anteriores y tabulemos los resultados.
 
 ```{r}
 svm_linear <- svm(mpg01 ~ ., 
@@ -2390,4 +2394,4 @@ roc_merge %>%
   roc_auc(truth, prob)
 ```
 
-En este caso, el modelo lineal tiene un mejor desempeño, pues el área bajo la curva ROC (AUC) para dicho modelo es mayor a los demas modelos. Sin embargo es importante resaltar que los modelos no tienen una diferencia muy marcada entre ellos pues el valor del AUC no varía demasiado, aun así, el modelo con kernel lineal posee mayor sinplicidad y obtiene un mayor AUC, por tanto es la mejor opción para realizar predicciones sobre este conjunto de datos.
+En este caso, el modelo lineal tiene un mejor desempeño, pues el área bajo la curva ROC (AUC) para dicho modelo es mayor a los demas modelos. Sin embargo es importante resaltar que los modelos no tienen una diferencia muy marcada entre ellos pues el valor del AUC no varía demasiado, aun así, el modelo con kernel lineal posee mayor simplicidad y obtiene un mayor AUC, por tanto es la mejor opción para realizar predicciones sobre este conjunto de datos.
