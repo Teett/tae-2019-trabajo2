@@ -2045,6 +2045,117 @@ Lo primero que se debe notar es que cuando los modelos no tienen una capacidad d
 
 Por otro lado se observa que al dotar a un modelo de capacidad no lineal, este representa muy bien la frontera de decisión. Sin embargo es importante poner a juicio la pregunta: ¿en este caso es mejor un modelo logístico con transformaciones no lineales, o una máquina de soporte vectorial?, y en este caso se considera que es mas recomendable siempre abordar los problemas desde el modelo computacionalmente más sencillo, el cuál es, el modelo logístico; además es importante resaltar que el modelo logístico brinda mucha más información respecto a los predictores que la máquina de soporte vectorial, sin dejar de lado la simplicidad e interpretabilidad del modelo, pues es importante recordar que este modelo ofrece una interpretabilidad probabilística, y da la posibilidad de abordar los resultados desde un punto de vista mucho mas estadístico en comparación con el SVM.
 
+
+# Sección 9.7 - Ejercicio 6
+
+## a) Generar un conjunto de datos apenas linealmente separable
+
+Se crea un conjunto de datos apenas linealmente separable Con el propósito de probar que una máquina de soporte vectorial con un valor de costo que clasifica de manera incorrecta en el conjunto de entrenamiento utilizando un valor de **costo** pequeño puede llegar a ser mejor en el conjunto de prueba que uno con costo mejor no cometa ningún error en el conjunto de entrenamiento.
+
+```{r}
+set.seed(5)
+synth <- tibble(a = c(runif(50, min = 0, max = 1), runif(50, min = 1.1, max = 2)-0.3),
+       b = c(runif(50, min = 0, max = 1), runif(50, min = 1.1, max = 2)-0.3),
+       resp = as_factor(c(rep("clase 1", 50), rep("clase 2", 50)))) 
+
+synth %>% 
+  ggplot(aes(x = a, y = b, color = resp)) +
+  geom_point()
+
+head(synth)
+```
+
+## b) Cómputo de los errores de validación utilizando SVM con diferentes rangos de costo
+
+```{r}
+tune_synth <- tune(svm, resp ~ ., data = synth, kernel = "linear", 
+                 ranges = list(cost = seq(from = 0.01, to = 50, by = 0.1)))
+
+l <- ggplot(data = tune_synth$performances) +
+  geom_line(mapping = aes(x = cost, y = error)) +
+  scale_x_log10() +
+  theme_economist() +
+  labs(title = "Errores respecto al costo", x = "Costo", y = "Error")
+
+ggplotly(l)
+
+summary(tune_synth$best.model)
+plot(tune_synth$best.model, synth)
+```
+
+Se identifica que utilizando validación cruzada, se cometen errores considerablemente bajos (0.04) con un costo entre 0.21 y 1, sin embargo, los errores de clasificación incrementan cuando el costo está entre 2.71 y 50;lo cual indicaría que no necesariamente aumentar el costo a un valor alto mejora la predicción en el conjunto de prueba.
+
+## c) Creación de un conjunto de validación y valores de costo asociados
+
+```{r}
+split_ratio_synth <- 0.75
+smp_size_synth <- floor(split_ratio_synth * nrow(synth))
+train_ind_synth <- sample(seq_len(nrow(synth)), size = smp_size_synth)
+
+synth_train <- synth[train_ind_synth, ]
+synth_test <- synth[-train_ind_synth, ]
+```
+
+### Modelo SVM con costo seleccionado por validación cruzada
+
+
+Gráfica de clasificación en el conjunto de entrenamiento:
+
+```{r}
+summary(tune_synth$best.model)
+plot(tune_synth$best.model, synth_train)
+```
+
+Clasificación en el conjunto de prueba: 
+
+```{r}
+plot(tune_synth$best.model, synth_test)
+```
+
+En general se evidencia que la máquina de soporte vectorial con kernel lineal no se vio muy afectada al no conocer la totalidad de los datos del conjunto. 
+
+```{r}
+svm_synth_class <- tibble(
+  pred = as.factor(predict(tune_synth$best.model, synth_test)) ,
+  real = synth_test$resp)
+
+svm_synth_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para la SVM con costo óptimo por validación cruzada")
+```
+
+En este caso, la máquina de soporte vectorial con kernel lineal tiene una clasificación casi perfecta en el conjunto de prueba, con una predicción incorrecta de la clase 1 cuando en realidad era la clase 2, ahora validemos la máquina de soporte vectorial con costo elevado.
+
+### Modelo con costo = 1000
+
+```{r}
+svm_synth_50 <- svm(resp ~ ., data = synth_train, kernel = "linear", cost = 1000, scale = FALSE, probability = TRUE)
+summary(svm_synth_50)
+```
+
+Gráfica de clasificación en el conjunto de entrenamiento
+```{r}
+plot(svm_synth_50, synth_train)
+```
+
+Clasificación en el conjunto de prueba: 
+```{r}
+plot(svm_synth_50, synth_test)
+```
+
+```{r}
+svm_synth_class_50 <- tibble(
+  pred = as.factor(predict(svm_synth_50, synth_test, probability = TRUE)) ,
+  real = synth_test$resp)
+
+svm_synth_class_50 %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión para la SVM con costo = 1000")
+```
+
+En este caso, la máquina de soporte vectorial con kernel lineal y costo alto, tiene también una clasificación buena en el conjunto de prueba, pero comete un solo error al predecir incorrectamente una observación con valor verdadero en la clase 2.
+
+
 # Sección 9.7 - Ejercicio 7
 
 En este caso, usaremos un SVM con el fin de predecir en qué momento un carro tiene alto o bajo consumo de combustible en el conjunto de datos `Auto`, considerando cuándo el consumo está por encima o por debajo de la mediana.
