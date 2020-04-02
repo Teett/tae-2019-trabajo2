@@ -1,9 +1,9 @@
 ---
-title: "Técnicas en aprendizaje estadístico - Introduction to Statistical Learning - ISLR"
+title: "Técnicas en Aprendizaje Estadístico - Introduction to Statistical Learning: Ejercicios Aplicados"
 author: 
   - Luis Daniel Chavarría Múnera
   - Hernán Darío Vanegas Madrigal
-date: "9/3/2020"
+date: "3/4/2020"
 output:
   rmdformats::readthedown:
     
@@ -2052,17 +2052,21 @@ Por otro lado se observa que al dotar a un modelo de capacidad no lineal, este r
 
 Se crea un conjunto de datos apenas linealmente separable Con el propósito de probar que una máquina de soporte vectorial con un valor de costo que clasifica de manera incorrecta en el conjunto de entrenamiento utilizando un valor de **costo** pequeño puede llegar a ser mejor en el conjunto de prueba que uno con costo mejor no cometa ningún error en el conjunto de entrenamiento.
 
+Entendemos por conjunto apenas linealmente separable un conjunto tal que sobre la línea de separación que utilizará el clasificador, haya observaciones de ambas clases.
+
 ```{r}
-set.seed(5)
-synth <- tibble(a = c(runif(50, min = 0, max = 1), runif(50, min = 1.1, max = 2)-0.3),
-       b = c(runif(50, min = 0, max = 1), runif(50, min = 1.1, max = 2)-0.3),
-       resp = as_factor(c(rep("clase 1", 50), rep("clase 2", 50)))) 
+set.seed(1)
+synth <- tibble(a = c(runif(200, min = 0, max = 2), runif(200, min = 0, max = 2)),
+       b = c(runif(200, min = 0, max = 1.1), runif(200, min = 1, max = 2)),
+       resp = as_factor(c(rep("clase 1", 200), rep("clase 2", 200)))) 
 
 synth %>% 
   ggplot(aes(x = a, y = b, color = resp)) +
   geom_point()
 
 head(synth)
+
+
 ```
 
 ## b) Cómputo de los errores de validación utilizando SVM con diferentes rangos de costo
@@ -2094,6 +2098,8 @@ train_ind_synth <- sample(seq_len(nrow(synth)), size = smp_size_synth)
 
 synth_train <- synth[train_ind_synth, ]
 synth_test <- synth[-train_ind_synth, ]
+dim(synth_train)
+dim(synth_test)
 ```
 
 ### Modelo SVM con costo seleccionado por validación cruzada
@@ -2153,7 +2159,7 @@ svm_synth_class_50 %>% conf_mat(truth = real, estimate = pred) %>%
   labs(title = "Matriz de confusión para la SVM con costo = 1000")
 ```
 
-En este caso, la máquina de soporte vectorial con kernel lineal y costo alto, tiene también una clasificación buena en el conjunto de prueba, pero comete un solo error al predecir incorrectamente una observación con valor verdadero en la clase 2.
+En este caso, la máquina de soporte vectorial con kernel lineal y costo alto, tiene también una clasificación buena en el conjunto de prueba, sin embargo esta es menor que en el modelo con costo óptimo. Esto es un buen indicador de que aumentar el costo no necesariamente incrementa la capacidad predictiva de un modelo en el conjunto de prueba.
 
 
 # Sección 9.7 - Ejercicio 7
@@ -2506,3 +2512,199 @@ roc_merge %>%
 ```
 
 En este caso, el modelo lineal tiene un mejor desempeño, pues el área bajo la curva ROC (AUC) para dicho modelo es mayor a los demas modelos. Sin embargo es importante resaltar que los modelos no tienen una diferencia muy marcada entre ellos pues el valor del AUC no varía demasiado, aun así, el modelo con kernel lineal posee mayor simplicidad y obtiene un mayor AUC, por tanto es la mejor opción para realizar predicciones sobre este conjunto de datos.
+
+# Sección 9.7 - Ejercicio 8
+
+## a) Conjuntos de entrenamiento y validación
+
+El conjunto de datos `OJ` contiene 1070 compras donde los clientes compraron un jugo de naranja de *Citrus Hill* o de *Maid Orange Juice* y se guardaron un número de características de los clientes. Se crea un conjunto de entrenamiento con 800 observaciones y 270 de prueba.
+
+```{r}
+oj_train <- as_tibble(OJ) %>% 
+  rownames_to_column() %>% 
+sample_n(size = 800)
+
+oj_test <- as_tibble(OJ) %>% 
+  rownames_to_column() %>% 
+  anti_join(oj_train, by = "rowname")
+
+oj_train <- oj_train %>% dplyr::select(-rowname)
+oj_test <- oj_test %>% dplyr::select(-rowname)
+dim(oj_train)
+dim(oj_test)
+```
+
+## b) Máquina de soporte vectorial con costo = 0.01 para clasificar el tipo de jugo comprado
+
+Dado que la cantidad de variables del conjunto OJ es relativamente grande, la flexibilidad o complejidad añadida por un kernel no lineal debería ser innecesaria, por este motivo se utilizará un kernel lineal en este apartado y en los apartados f) y g) verificaremos los resultados con kernel radial y polinomial.
+
+```{r}
+svm_oj <- svm(Purchase ~ ., data = oj_train, kernel = "linear", cost = 0.01, probability = TRUE)
+summary(svm_oj)
+
+```
+
+En total se tienen 441 vectores de soporte, de los cuales 220 corresponden al jugo *Citru Hill* y 221 al jugo *Maid Orange Juice*. 
+
+## c) Errores de entrenamiento y validación
+
+```{r}
+training_oj_class <- tibble(pred = svm_oj$fitted,
+                            real = oj_train$Purchase)
+
+training_oj_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión de la SVM con costo = 0.01 en el conjunto de entrenamiento")
+
+training_oj_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+En este caso, se tiene una tasa de clasificación correcta del 82.2% en el conjunto de entrenamiento, pero esta métrica no es de tanto interés como la del conjunto de validación, ya que se quiere probar el rendimiento de este algoritmo con información desconocida para el modelo.
+
+```{r}
+testing_oj_class <- tibble(pred = predict(svm_oj, newdata = oj_test),
+                            real = oj_test$Purchase)
+
+testing_oj_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión de la SVM con costo = 0.01 en el conjunto de prueba")
+
+testing_oj_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+De manera atípica, el algoritmo tiene mejor rendimiento en el conjunto de prueba, con una tasa de clasificación correcta del 83.3%. 
+
+## d) Validación cruzada para hacer *tunning* de la mejor SVM
+
+```{r}
+tune_oj <- tune(svm, Purchase ~ ., data = oj_train, kernel = "linear", probability = TRUE,
+                 ranges = list(cost = seq(from = 0.01, to = 10, by = 1)))
+
+k <- ggplot(data = tune_oj$performances) +
+  geom_line(mapping = aes(x = cost, y = error)) +
+  scale_x_log10() +
+  theme_economist() +
+  labs(title = "Errores respecto al costo", x = "Costo", y = "Error")
+
+ggplotly(k)
+
+summary(tune_oj$best.model)
+```
+
+El mejor modelo utiliza 171 vectores de soporte para la clase *Citru Hill* y 172 para el jugo *Maid Orange Juice* utilizando un costo de 2.16, considerablemente menos vectores que el modelo con costo = 0.01 que tenía un error de validación cruzada de 0.17 como se puede ver en la gráfica.
+
+## e) Errores de entrenamiento y validación para el mejor modelo seleccionado
+
+```{r}
+training_oj_lineal_class <- tibble(pred = tune_oj$best.model$fitted,
+                            real = oj_train$Purchase)
+
+training_oj_lineal_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión de la SVM con costo = 2.16 en el conjunto de entrenamiento")
+
+training_oj_lineal_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+Se tiene una tasa de clasificación correcta del 83.1% en el conjunto de entrenamiento, una mejora ligera con respecto al clasificador con costo = 0.01, sin embargo, esta mejora es en entrenamiento y no representa el comportamiento del algoritmo para predecir de manera correcta. Realicemos la validación en el conjunto de prueba.
+
+```{r}
+testing_oj_lineal_class <- tibble(pred = predict(tune_oj$best.model, newdata = oj_test),
+                            real = oj_test$Purchase)
+
+testing_oj_lineal_class %>% conf_mat(truth = real, estimate = pred) %>% 
+  autoplot(type = "heatmap") + 
+  labs(title = "Matriz de confusión de la SVM con costo = 0.01 en el conjunto de prueba")
+
+testing_oj_lineal_class %>% 
+  metrics(truth = real, estimate = pred)
+```
+
+La mejora utilizando el mejor costo por validación cruzada es muy ligera, cambiando de 83.3% a 83.7%, lo cual puede ser significativo para la decisión que se toma con respecto a una cantidad grande de jugos de naranja.
+
+## d y e) Comparación de los modelos con kernel radial y polinómico de grado 2
+
+Ajustemos inicialmente los 2 nuevos modelos con el conjunto de entrenamiento utilizando la función `tune` para seleccionar el mejor modelo directamente. 
+
+```{r}
+tune_oj_radial <- tune(svm, Purchase ~ ., data = oj_train, kernel = "radial", probability = TRUE,
+                 ranges = list(cost = seq(from = 0.01, to = 10, by = 0.1)))
+
+tune_oj_poly <- tune(svm, Purchase ~ ., data = oj_train, kernel = "polynomial", degree = 2, probability = TRUE,
+                     ranges = list(cost = seq(from = 0.01, to = 10, by = 0.1)))
+
+summary(tune_oj_radial$best.model)
+summary(tune_oj_poly$best.model)
+```
+
+Para el modelo con kernel polinomial se tienen 372 vectores de soporte y un costo de 5.01; para el modelo con kernel radial se tienen 407 vectores de soporte y un costo de 0.61.
+
+### Comparación de los 3 modelos de SVM en el conjunto de prueba
+
+Para comparar efectivamente estos modelos sin tener que analizar 6 matrices de confusión, utilizaremos la tasa de verdaderos positivos (sensibilidad) vs la tasa de falsos positivos (1 - especificidad) mediante una curva ROC en el conjunto de prueba, en general, el modelo con mayor área bajo la curva presentará los mejores resultados de clasificación. 
+
+```{r}
+linear <- svm(Purchase ~ ., data = oj_train, kernel = "linear", probability = TRUE, cost = tune_oj$best.model$cost)
+pred_linear <- predict(linear, newdata = oj_test, probability = TRUE)
+
+radial <- svm(Purchase ~ ., data = oj_train, kernel = "radial", probability = TRUE, cost = tune_oj_radial$best.model$cost)
+pred_radial <- predict(radial, newdata = oj_test, probability = TRUE)
+
+poly <- svm(Purchase ~ ., data = oj_train, kernel = "polynomial", probability = TRUE, cost = tune_oj_poly$best.model$cost)
+pred_poly <- predict(poly, newdata = oj_test, probability = TRUE)
+
+roc_linear <- tibble(
+  estimate = pred_linear, 
+  truth = oj_test$Purchase,
+  prob = attr(pred_linear,"probabilities")[, 2],
+  Modelo = "Lineal")
+
+roc_radial <- tibble(
+  estimate = pred_radial, 
+  truth = oj_test$Purchase,
+  prob = attr(pred_radial,"probabilities")[, 2],
+  Modelo = "Radial")
+
+roc_poly <- tibble(
+  estimate = pred_poly, 
+  truth = oj_test$Purchase,
+  prob = attr(pred_poly,"probabilities")[, 2],
+  Modelo = "Polinomial")
+```
+
+Con la utilización del argumento `probability = TRUE` se le indica al método `svm` que calcule las probabilidades necesarias para la curva ROC.
+
+```{r}
+roc_merge <- rbind(roc_linear, roc_radial, roc_poly)
+
+roc_merge %>% 
+  group_by(Modelo) %>% 
+  roc_curve(truth, prob) %>% 
+  autoplot() +
+  labs(title = "Curvas ROC de los modelos SVM con diferente Kernel")
+```
+
+En general se identifica que la curva del modelo Polinomial se enceuntra por debajo de las demás. Se puede notar que los modelos entrenados tienen una buena calidad pues las curvas ROC estan alejadas de la recta dada por la función $f(x) = x$. 
+
+Con el objetivo de determinar una diferencia entre los modelos, veamos el AUC para cada uno de ellos.
+
+```{r}
+roc_merge %>% 
+  group_by(Modelo) %>% 
+  roc_auc(truth, prob)
+```
+
+El AUC del modelo lineal es ligeramente mayor que el de los demás modelos, lo cual indica que la suposición de que la complejidad/flexibilidad añadida por los kernel radial y polinomial al haber gran cantidad de variables busca patrones en los datos de entrenamiento que posiblemente no son generales para para el conjunto de datos completo, generando un ligero sobreajuste.
+
+# Conclusiones
+
+- Durante el desarrollo de este trabajo se aplicaron diferentes técnicas de aprendizaje estadístico (Regresión logística, Regresión lineal, Regresión lineal múltiple, Stepwise regression, Árboles de decisión, bosques aleatorios, Boosting, Bagging, Máquinas de soporte vectorial) sobre conjuntos de datos de la vida real y también generados sintéticamente; con el objetivo de entender el principio teórico de los algoritmos y además afrontar las dificultades técnicas que puede llevar su implementación.
+
+- Dada la extensión de este trabajo (Casi 3000 líneas de código y comentarios), aprendimos a trabajar en equipo de manera muy integrada utilizando control de versiones mediante Git y verificando el trabajo realizado, afrontamos además las dificultades de compilar un informe de gran extensión y los errores que pudieron surgir en el camino.
+
+- En este trabajo hubo ejercicios en los que se realizó análisis descriptivo exhaustivo, gracias a esto identificamos que éste es un paso esencial que puede dar muchas entradas para la selección de un modelo correcto y las variables que se deberían incorporar o no. Además, aprendimos a poner los diferentes modelos a prueba y a identificar cuál es el más adecuado utilizando medidas de error y visualizaciones correctas.  
+
+- En muchos de estos ejercicios identificamos que a veces los métodos más clásicos como la regresión lineal pueden entregar resultados mejores que algoritmos de alta complejidad, por lo que siempre será de nuestro interés verificar las circunstancias bajo las que se decide utilizar una técnica más compleja y evaluar que el costo añadido de cómputo, abstracción y programación valga la pena.
